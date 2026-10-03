@@ -1,9 +1,101 @@
 # actions/reminder.py
 
+import platform
 import subprocess
 import os
 import sys
 from datetime import datetime
+
+
+def _reminder_macos_linux(target_dt, safe_message, task_name) -> str:
+    """Schedule a reminder on macOS (launchd) or Linux (at/cron). Windows path below is unchanged."""
+    import tempfile
+    tmp = tempfile.gettempdir()
+    notify_script = os.path.join(tmp, f"{task_name}.py")
+    _OS = platform.system()
+    if _OS == "Darwin":
+        script_code = f'''import subprocess
+msg = """{safe_message}"""
+try:
+    subprocess.run(["osascript", "-e", f'display notification "{{msg}}" with title "Brahma Reminder" sound name "Ping"'])
+except Exception:
+    pass
+try:
+    subprocess.run(["say", msg])
+except Exception:
+    pass
+try:
+    import os
+    os.remove(__file__)
+except Exception:
+    pass
+'''
+    else:
+        script_code = f'''import subprocess, shutil
+msg = """{safe_message}"""
+try:
+    if shutil.which("notify-send"):
+        subprocess.run(["notify-send", "Brahma Reminder", msg])
+    elif shutil.which("zenity"):
+        subprocess.run(["zenity", "--info", "--text=" + msg])
+except Exception:
+    pass
+print(msg)
+try:
+    import os
+    os.remove(__file__)
+except Exception:
+    pass
+'''
+    with open(notify_script, "w", encoding="utf-8") as f:
+        f.write(script_code)
+
+    if _OS == "Darwin":
+        from pathlib import Path
+        label = f"com.brahma.{task_name.lower()}"
+        plist_dir = Path.home() / "Library" / "LaunchAgents"
+        plist_dir.mkdir(parents=True, exist_ok=True)
+        plist = plist_dir / f"{label}.plist"
+        plist.write_text(
+            f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>{label}</string>
+<key>ProgramArguments</key><array><string>{sys.executable}</string><string>{notify_script}</string></array>
+<key>StartCalendarInterval</key><dict><key>Month</key><integer>{target_dt.month}</integer><key>Day</key><integer>{target_dt.day}</integer><key>Hour</key><integer>{target_dt.hour}</integer><key>Minute</key><integer>{target_dt.minute}</integer></dict>
+</dict></plist>""",
+            encoding="utf-8",
+        )
+        r = subprocess.run(["launchctl", "load", str(plist)], capture_output=True, text=True)
+        if r.returncode != 0:
+            return "I couldn't schedule the reminder due to a system error."
+        return f"Reminder set for {target_dt.strftime('%B %d at %I:%M %p')}."
+    # Linux: prefer `at`, fall back to cron
+    at_time = target_dt.strftime("%H:%M %Y-%m-%d")
+    try:
+        r = subprocess.run(["which", "at"], capture_output=True)
+        if r.returncode == 0:
+            p = subprocess.run(["at", at_time], input=f"{sys.executable} {notify_script}\n",
+                               capture_output=True, text=True)
+            if p.returncode == 0:
+                return f"Reminder set for {target_dt.strftime('%B %d at %I:%M %p')}."
+    except Exception:
+        pass
+    try:
+        cron_line = f"{target_dt.minute} {target_dt.hour} {target_dt.day} {target_dt.month} * {sys.executable} {notify_script} # {task_name}"
+        r = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+        existing = r.stdout if r.returncode == 0 else ""
+        lines = [l for l in existing.splitlines() if task_name not in l]
+        lines.append(cron_line)
+        subprocess.run(["crontab", "-"], input="\n".join(lines) + "\n",
+                       capture_output=True, text=True)
+        return f"Reminder set for {target_dt.strftime('%B %d at %I:%M %p')}."
+    except Exception:
+        try:
+            os.remove(notify_script)
+        except Exception:
+            pass
+        return "I couldn't schedule the reminder due to a system error."
 
 
 def reminder(
@@ -39,6 +131,13 @@ def reminder(
 
         task_name    = f"MARKReminder_{target_dt.strftime('%Y%m%d_%H%M')}"
         safe_message = message.replace('"', '').replace("'", "").strip()[:200]
+
+        # Non-Windows: native scheduler, same feature. Windows Task Scheduler path below untouched.
+        if os.name != "nt" or platform.system() != "Windows":
+            msg = _reminder_macos_linux(target_dt, safe_message, task_name)
+            if player:
+                player.write_log(f"[reminder] set for {date_str} {time_str}")
+            return msg
 
         python_exe = sys.executable
         if python_exe.lower().endswith("python.exe"):

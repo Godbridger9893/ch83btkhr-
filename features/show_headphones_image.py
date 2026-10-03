@@ -15,7 +15,7 @@ import numpy as np
 def execute(**kwargs):
     """
     Renders and displays a sleek high-fidelity headphones visual deliverable
-    on the Brahma Evo HUD screen.
+    on the Celestia HUD screen.
     """
     try:
         output_dir = os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')), 'BrahmaAI', 'deliverables')
@@ -54,7 +54,7 @@ def execute(**kwargs):
         wave_y = 0.9 + 0.15 * np.sin(wave_x * 12)
         ax.plot(wave_x, wave_y, color='#10B981', linewidth=2, alpha=0.9)
 
-        ax.text(0, 0.3, 'BRAHMA EVO // AUDIO INTELLIGENCE', color='#38BDF8', fontsize=10, fontweight='bold', ha='center')
+        ax.text(0, 0.3, 'CELESTIA // AUDIO INTELLIGENCE', color='#38BDF8', fontsize=10, fontweight='bold', ha='center')
         ax.text(0, 0.0, 'PRO WIRELESS STUDIO HEADPHONES', color='#FFFFFF', fontsize=12, fontweight='bold', ha='center')
         ax.text(0, -0.3, 'Active Noise Cancellation 98%  |  Lossless Audio 24-bit/192kHz', color='#94A3B8', fontsize=8, ha='center')
 

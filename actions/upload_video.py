@@ -190,11 +190,18 @@ def run(parameters: dict, player=None, speak=None, session_memory=None) -> str:
         except Exception as e:
             logger.warning(f"Failed to copy to clipboard: {e}")
 
-    # Step 4: Reveal file in Windows Explorer
-    if video_file and video_file.exists() and sys.platform == "win32":
+    # Step 4: Reveal file in the native file manager
+    if video_file and video_file.exists():
         try:
-            subprocess.Popen(["explorer.exe", f"/select,{str(video_file)}"])
-            _log(f"[Publisher] Highlighted {video_file.name} in Windows Explorer for drag & drop.")
+            if sys.platform == "win32":
+                subprocess.Popen(["explorer.exe", f"/select,{str(video_file)}"])
+                _log(f"[Publisher] Highlighted {video_file.name} in Windows Explorer for drag & drop.")
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", "-R", str(video_file)])
+                _log(f"[Publisher] Revealed {video_file.name} in Finder for drag & drop.")
+            else:
+                subprocess.Popen(["xdg-open", str(video_file.parent)])
+                _log(f"[Publisher] Opened {video_file.parent} for drag & drop.")
         except Exception as e:
             logger.warning(f"Could not reveal file in explorer: {e}")
 

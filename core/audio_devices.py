@@ -17,7 +17,7 @@ WHY NAMES, NOT INDICES
 
 WHY THIS IS CACHED
     `sd.query_devices()` talks to the host audio API and can take a few hundred
-    milliseconds on a Windows machine with many endpoints. Brahma Evo learned this
+    milliseconds on a Windows machine with many endpoints. Celestia learned this
     lesson the expensive way — a 2.1-second `openwakeword` import on the Qt
     thread made the settings drawer look like it was broken. So the list is
     fetched once on a background thread at startup and served from cache.
@@ -249,6 +249,28 @@ _PSEUDO_DEVICES = (
     "samplerate", "speexrate", "upmix", "vdownmix", "null",
 )
 
+# Virtual loopback / meeting-routing devices. They are REAL endpoints (so they
+# are listed and remain selectable by name), but they must never win the
+# *default* slot: on a Mac with BlackHole/Loopback installed, "first available
+# input" would otherwise be a silent virtual cable and Brahma hears nothing.
+_VIRTUAL_DEVICES = (
+    "blackhole",
+    "soundflower",
+    "loopback",            # Rogue Amoeba Loopback virtual devices
+    "quicktime",           # "QuickTime Input" virtual feed
+    "computer audio",      # screen-capture audio taps
+    "zoomaudio", "zoom audio",
+    "teams audio", "microsoft teams",
+    "webex",
+    "voicemeeter", "vb-audio", "vb audio", "virtual audio", "virtual microphone",
+    "manycam", "obs",     # virtual cameras' audio taps
+)
+
+
+def _is_virtual(name: str) -> bool:
+    low = name.lower()
+    return any(tok in low for tok in _VIRTUAL_DEVICES)
+
 
 def _is_pseudo(name: str) -> bool:
     low = name.lower()
@@ -291,6 +313,10 @@ def _query() -> dict[str, list[str]]:
                     continue
                 seen.add(name)
                 found.append((idx, name))
+            # Physical hardware first: virtual loopbacks sink to the bottom so
+            # the "first available device" default is a mic that hears the room.
+            # Stable sort keeps enumeration order inside each group.
+            found.sort(key=lambda item: _is_virtual(item[1]))
             return found
 
         # Each direction picks its own host API. They are genuinely different

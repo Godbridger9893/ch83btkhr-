@@ -16,13 +16,13 @@ mediapipe
 mss
 Pillow
 psutil
-comtypes
-pycaw               
+comtypes; sys_platform == 'win32'
+pycaw; sys_platform == 'win32'
 instagrapi
-win10toast          
+win10toast; sys_platform == 'win32'
 send2trash
 youtube-transcript-api
-pywinauto
+pywinauto; sys_platform == 'win32'
 pyaudio
 openpyxl
 python-pptx
@@ -39,3 +39,5 @@ PyQt6-WebEngine
 edge-tts
 matplotlib
 speedtest-cli
+pynput; sys_platform != 'win32'
+pyobjc-framework-AVFoundation; sys_platform == 'darwin'

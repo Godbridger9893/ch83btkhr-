@@ -32,14 +32,22 @@ def test_globe_html_performance_optimizations():
     assert "translateZ(0)" in content
 
 def test_chromium_gpu_flags():
+    import sys
     assert "QTWEBENGINE_CHROMIUM_FLAGS" in os.environ
     flags = os.environ["QTWEBENGINE_CHROMIUM_FLAGS"]
     assert "--enable-gpu-rasterization" in flags
     assert "--enable-zero-copy" in flags
     assert "--ignore-gpu-blocklist" in flags
-    assert "--disable-frame-rate-limit" in flags
-    assert "--disable-gpu-vsync" in flags
-    assert "--use-angle=d3d11" in flags
+    if sys.platform == "win32":
+        assert "--disable-frame-rate-limit" in flags
+        assert "--disable-gpu-vsync" in flags
+        assert "--use-angle=d3d11" in flags
+    elif sys.platform == "darwin":
+        assert "--use-angle=metal" in flags
+        assert "d3d11" not in flags
+    else:
+        assert "--use-angle=opengl" in flags
+        assert "d3d11" not in flags
 
 def test_globe_bridge_signals():
     bridge = GlobeBridge()

@@ -9,11 +9,29 @@ import threading
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
-# Hardware acceleration & WebGL flags for smooth 180fps+ rendering in Chromium
-os.environ.setdefault(
-    "QTWEBENGINE_CHROMIUM_FLAGS",
-    "--enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist --enable-accelerated-2d-canvas --enable-webgl --enable-webgl2-compute-context --disable-frame-rate-limit --disable-gpu-vsync --num-raster-threads=4 --use-angle=d3d11 --disable-gpu-driver-bug-workarounds"
-)
+# Hardware acceleration & WebGL flags for Chromium (platform-specific).
+# d3d11 is Windows-only — on macOS Chromium aborts (`trace trap`).
+if "QTWEBENGINE_CHROMIUM_FLAGS" not in os.environ:
+    import sys as _sys
+    if _sys.platform == "win32":
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+            "--enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist "
+            "--enable-accelerated-2d-canvas --enable-webgl --enable-webgl2-compute-context "
+            "--disable-frame-rate-limit --disable-gpu-vsync --num-raster-threads=4 "
+            "--use-angle=d3d11 --disable-gpu-driver-bug-workarounds"
+        )
+    elif _sys.platform == "darwin":
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+            "--enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist "
+            "--enable-accelerated-2d-canvas --enable-webgl --enable-webgl2-compute-context "
+            "--num-raster-threads=4 --use-gl=angle --use-angle=metal"
+        )
+    else:
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+            "--enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist "
+            "--enable-accelerated-2d-canvas --enable-webgl --enable-webgl2-compute-context "
+            "--num-raster-threads=4 --use-gl=angle --use-angle=opengl"
+        )
 
 from PyQt6.QtCore import Qt, QUrl, pyqtSlot, QObject, pyqtSignal, QTimer, QPoint, QCoreApplication
 from PyQt6.QtWidgets import (

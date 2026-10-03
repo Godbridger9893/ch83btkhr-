@@ -7,11 +7,30 @@ import html as html_lib
 import math
 import os
 
-# Hardware acceleration & WebGL flags for smooth 180fps+ rendering in Chromium
-os.environ.setdefault(
-    "QTWEBENGINE_CHROMIUM_FLAGS",
-    "--enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist --enable-accelerated-2d-canvas --enable-webgl --enable-webgl2-compute-context --disable-frame-rate-limit --disable-gpu-vsync --num-raster-threads=4 --use-angle=d3d11 --disable-gpu-driver-bug-workarounds"
-)
+# Hardware acceleration & WebGL flags for Chromium (platform-specific).
+# main.py sets these first; this is a fallback for `import ui` without main.
+# NOTE: d3d11 is Windows-only — on macOS Chromium aborts (`trace trap`).
+if "QTWEBENGINE_CHROMIUM_FLAGS" not in os.environ:
+    import sys as _sys
+    if _sys.platform == "win32":
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+            "--enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist "
+            "--enable-accelerated-2d-canvas --enable-webgl --enable-webgl2-compute-context "
+            "--disable-frame-rate-limit --disable-gpu-vsync --num-raster-threads=4 "
+            "--use-angle=d3d11 --disable-gpu-driver-bug-workarounds"
+        )
+    elif _sys.platform == "darwin":
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+            "--enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist "
+            "--enable-accelerated-2d-canvas --enable-webgl --enable-webgl2-compute-context "
+            "--num-raster-threads=4 --use-gl=angle --use-angle=metal"
+        )
+    else:
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+            "--enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist "
+            "--enable-accelerated-2d-canvas --enable-webgl --enable-webgl2-compute-context "
+            "--num-raster-threads=4 --use-gl=angle --use-angle=opengl"
+        )
 
 import platform
 import random
@@ -66,6 +85,36 @@ def _base_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
     return Path(__file__).resolve().parent
+
+
+def _open_native(path: str | Path, reveal: bool = False) -> bool:
+    """Opens a file/folder (or reveals it in the file manager) the native way.
+
+    Windows: startfile / explorer /select. macOS: open / open -R.
+    Linux: xdg-open. Never raises — returns True if launched.
+    """
+    try:
+        p = str(path)
+        if sys.platform == "win32":
+            if reveal:
+                subprocess.Popen(["explorer", "/select,", p])
+            else:
+                os.startfile(p)  # type: ignore[attr-defined]
+            return True
+        if sys.platform == "darwin":
+            if reveal:
+                subprocess.Popen(["open", "-R", p])
+            else:
+                subprocess.Popen(["open", p])
+            return True
+        import shutil
+        opener = shutil.which("xdg-open")
+        if opener:
+            subprocess.Popen([opener, p])
+            return True
+        return False
+    except Exception:
+        return False
 
 BASE_DIR   = _base_dir()
 CONFIG_DIR = get_user_data_dir() / "config"
@@ -435,7 +484,7 @@ class RemoteKeyOverlay(QWidget):
         title.setStyleSheet("color: #ffffff; background: transparent; border: none;")
         lay.addWidget(title)
 
-        subtitle = QLabel("Scan the QR code with your phone to remotely control Brahma Evo.")
+        subtitle = QLabel("Scan the QR code with your phone to remotely control Celestia.")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         subtitle.setWordWrap(True)
         subtitle.setFont(QFont("Segoe UI", 9))
@@ -591,7 +640,7 @@ class RemoteKeyOverlay(QWidget):
         self._qr_label.setText("OK")
         self._qr_label.setFont(QFont("Segoe UI", 34, QFont.Weight.Black))
         self._qr_label.setStyleSheet("color: #37ff5f; background: #041006; border-radius: 12px;")
-        self._timer_lbl.setText("Phone connected. Brahma Evo remote is ready.")
+        self._timer_lbl.setText("Phone connected. Celestia remote is ready.")
 
     def _refresh_key(self):
         if not self._on_new_key:
@@ -1919,7 +1968,16 @@ class GestureCameraPreview(QFrame):
             return
         try:
             import cv2
-            cap = cv2.VideoCapture(0, cv2.CAP_DSHOW if hasattr(cv2, "CAP_DSHOW") else cv2.CAP_ANY)
+            import sys as _sys
+            # Capture backend is OS-specific: DirectShow exists only on Windows
+            # and actively breaks camera open on macOS. AVFoundation on Mac.
+            if _sys.platform == "darwin":
+                backend = cv2.CAP_AVFOUNDATION
+            elif _sys.platform == "win32" and hasattr(cv2, "CAP_DSHOW"):
+                backend = cv2.CAP_DSHOW
+            else:
+                backend = cv2.CAP_ANY
+            cap = cv2.VideoCapture(0, backend)
             try:
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
@@ -1927,6 +1985,12 @@ class GestureCameraPreview(QFrame):
                 pass
             if not cap.isOpened():
                 cap.release()
+                import sys as _sys3
+                if _sys3.platform == "darwin":
+                    raise RuntimeError(
+                        "camera unavailable — grant Camera access: System Settings → "
+                        "Privacy & Security → Camera → enable your terminal app, then restart"
+                    )
                 raise RuntimeError("camera unavailable")
             self._cap = cap
             self._timer = QTimer(self)
@@ -2028,9 +2092,15 @@ class GestureCameraPreview(QFrame):
             pass
 
         if mp is None:
+            import sys as _sys2
+            _pip_hint = (
+                "python -m pip install mediapipe"
+                if _sys2.platform == "win32"
+                else "pip3 install mediapipe  (or: python3 -m pip install mediapipe)"
+            )
             self._set_status(
                 "Gesture camera unavailable: mediapipe not found. "
-                "Install it into the app venv: .venv\\Scripts\\python.exe -m pip install mediapipe",
+                f"Install it with: {_pip_hint}",
                 "lost",
             )
             return
@@ -2066,7 +2136,7 @@ class GestureCameraPreview(QFrame):
                 if vision is None or not hasattr(vision, "HandLandmarker"):
                     self._set_status(
                         "Gesture camera unavailable: mediapipe Tasks API not available. "
-                        "Install mediapipe into the app venv and restart.",
+                        "Run: pip3 install --upgrade mediapipe  (Windows: python -m pip install --upgrade mediapipe)",
                         "lost",
                     )
                     return
@@ -2495,7 +2565,7 @@ class TaskCard(QFrame):
         self._command_lbl.setStyleSheet(f"color: {C.WHITE}; background: transparent;")
         lay.addWidget(self._command_lbl)
 
-        self._plan_lbl = QLabel("Plan: Brahma Evo will generate a task plan after you send a command.")
+        self._plan_lbl = QLabel("Plan: Celestia will generate a task plan after you send a command.")
         self._plan_lbl.setWordWrap(True)
         self._plan_lbl.setFont(QFont("Segoe UI", 9))
         self._plan_lbl.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
@@ -2547,7 +2617,7 @@ class TaskCard(QFrame):
         self._title.setText(title)
         self._status_lbl.setText(desc)
         self._output_lbl.setText(desc)
-        self._plan_lbl.setText("Plan: Brahma Evo will generate a task plan after you send a command.")
+        self._plan_lbl.setText("Plan: Celestia will generate a task plan after you send a command.")
         self._command_lbl.setText("Command: waiting for input")
         self._pct.setText(f"{percent}%")
         self._bar.setValue(max(0, min(100, percent)))
@@ -2616,7 +2686,7 @@ class TaskCard(QFrame):
         self._workspace_locked = False
         self._title.setText("Ready")
         self._command_lbl.setText("Command: waiting for input")
-        self._plan_lbl.setText("Plan: Brahma Evo will generate a task plan after you send a command.")
+        self._plan_lbl.setText("Plan: Celestia will generate a task plan after you send a command.")
         self._status_lbl.setText("Status: Idle")
         self._output_lbl.setText("Output: Ready to work.")
         self._pct.setText("0%")
@@ -2814,21 +2884,12 @@ class ArtifactCard(QFrame):
     def _open_file(self):
         if not self._path or not Path(self._path).exists():
             return
-        try:
-            os.startfile(self._path)
-        except Exception:
-            pass
+        _open_native(self._path)
 
     def _reveal_file(self):
         if not self._path or not Path(self._path).exists():
             return
-        try:
-            if platform.system() == "Windows":
-                subprocess.Popen(["explorer", "/select,", self._path])
-            else:
-                os.startfile(str(Path(self._path).parent))
-        except Exception:
-            pass
+        _open_native(self._path, reveal=True)
 
 
 class ChatBubble(QFrame):
@@ -2866,7 +2927,7 @@ class ChatBubble(QFrame):
         if role == "assistant":
             avatar = _framed_logo(24, 24, bg="rgba(12,14,20,245)", border="rgba(0, 229, 255,0.50)", radius=12, inset=4)
             head.addWidget(avatar)
-            name_lbl = QLabel(name or "Brahma Evo")
+            name_lbl = QLabel(name or "Celestia")
             name_lbl.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
             name_lbl.setStyleSheet("color: #ffffff; background: transparent;")
             head.addWidget(name_lbl)
@@ -3054,7 +3115,7 @@ class ConversationFeed(QScrollArea):
         lay = QVBoxLayout(frame)
         lay.setContentsMargins(14, 12, 14, 12)
         lay.setSpacing(10)
-        title = QLabel("Try asking Brahma Evo")
+        title = QLabel("Try asking Celestia")
         title.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
         title.setStyleSheet("color: #ffffff; background: transparent;")
         subtitle = QLabel("Create a presentation, analyze a screen, build a website, organize files, or run browser automation.")
@@ -3167,10 +3228,10 @@ class ConversationFeed(QScrollArea):
             attachments = msg.get("attachments") or []
             name = {
                 "user": "You",
-                "assistant": "Brahma Evo",
+                "assistant": "Celestia",
                 "system": "System",
                 "file": "Files",
-            }.get(role, "Brahma Evo")
+            }.get(role, "Celestia")
             self.add_message(role, name, content, stamp, attachments=attachments, animate=False)
         self._sync_empty_state()
         QTimer.singleShot(0, self.scroll_to_bottom)
@@ -3363,7 +3424,7 @@ class WorkspaceSidebar(QWidget):
 
         header = QHBoxLayout()
         header.setSpacing(10)
-        self._title = QLabel("BRAHMA EVO WORKSPACE")
+        self._title = QLabel("EVO WORKSPACE")
         self._title.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         self._title.setStyleSheet("color: #FFFFFF; background: transparent; letter-spacing: 1px;")
         header.addWidget(self._title)
@@ -3526,7 +3587,7 @@ class WorkspaceSidebar(QWidget):
         input_row.addWidget(self._attach_btn)
 
         self._input = QLineEdit()
-        self._input.setPlaceholderText("Message Brahma Evo...")
+        self._input.setPlaceholderText("Message Celestia...")
         self._input.setFont(QFont("Segoe UI", 10))
         self._input.setStyleSheet(
             f"QLineEdit {{ background: transparent; color: {C.WHITE}; border: none; padding: 2px 4px; selection-background-color: rgba(0, 229, 255, 0.25); }}"
@@ -3859,7 +3920,7 @@ class WorkspaceSidebar(QWidget):
         if not raw:
             return
         low = raw.lower()
-        if low.startswith(("you:", "brahma evo:")):
+        if low.startswith(("you:", "celestia:", "evo:", "brahma evo:")):
             return
         if low.startswith("sys:"):
             self.record_chat_event({"role": "system", "text": raw.split(":", 1)[1].strip(), "source": "local"})
@@ -3882,7 +3943,7 @@ class WorkspaceSidebar(QWidget):
         elif role == "assistant":
             convo_id = self._store.record_chat("assistant", text, conversation_id=convo_id, attachments=attachments)
             self._active_conversation_id = convo_id
-            self._feed.add_message("assistant", "Brahma Evo", text, _fmt_time_stamp(stamp), attachments=attachments, animate=True)
+            self._feed.add_message("assistant", "Celestia", text, _fmt_time_stamp(stamp), attachments=attachments, animate=True)
             self._hide_memory_banner()
         elif role == "system":
             convo_id = self._store.record_chat("system", text, conversation_id=convo_id, attachments=attachments)
@@ -4112,7 +4173,7 @@ class InlineChatWorkspace(QFrame):
         input_row.addWidget(self._attach_btn)
 
         self._input = QLineEdit()
-        self._input.setPlaceholderText("Message Brahma Evo...")
+        self._input.setPlaceholderText("Message Celestia...")
         self._input.setFont(QFont("Segoe UI", 10))
         self._input.setStyleSheet(
             f"QLineEdit {{ background: transparent; color: {C.WHITE}; border: none; padding: 0 4px; selection-background-color: rgba(0, 229, 255, 0.25); }}"
@@ -4146,7 +4207,7 @@ class InlineChatWorkspace(QFrame):
 
         footer = QHBoxLayout()
         footer.setContentsMargins(4, 2, 4, 2)
-        self._footer_status = QLabel("Brahma Evo is ready")
+        self._footer_status = QLabel("Celestia is ready")
         self._footer_status.setFont(QFont("Segoe UI", 8))
         self._footer_status.setStyleSheet("color: rgba(255, 255, 255, 0.55); background: transparent;")
         footer.addWidget(self._footer_status)
@@ -4163,12 +4224,12 @@ class InlineChatWorkspace(QFrame):
         if hasattr(self, "_footer_status") and self._footer_status:
             status_text = {
                 "listening": "Listening to your voice...",
-                "speaking": "Brahma Evo is speaking...",
+                "speaking": "Celestia is speaking...",
                 "thinking": "Synthesizing response...",
                 "executing": "Executing task...",
                 "working": "Processing request...",
                 "muted": "Microphone muted",
-            }.get((state or "").lower(), "Brahma Evo is ready")
+            }.get((state or "").lower(), "Celestia is ready")
             self._footer_status.setText(status_text)
 
     def _build_history_tab(self) -> QWidget:
@@ -4293,7 +4354,7 @@ class InlineChatWorkspace(QFrame):
             self._show_memories(self._store.search_memories(text))
         elif role == "assistant":
             self._store.record_chat("assistant", text, conversation_id=convo_id, attachments=attachments)
-            self._feed.add_message("assistant", "Brahma Evo", text, stamp, attachments=attachments)
+            self._feed.add_message("assistant", "Celestia", text, stamp, attachments=attachments)
             self._hide_memories()
         elif role == "system":
             self._store.record_chat("system", text, conversation_id=convo_id, attachments=attachments)
@@ -4310,7 +4371,7 @@ class InlineChatWorkspace(QFrame):
         low = raw.lower()
         if low.startswith("you:"):
             self.record_chat_event({"role": "user", "text": raw.split(":", 1)[1].strip()})
-        elif low.startswith("brahma evo:"):
+        elif low.startswith(("celestia:", "evo:", "brahma evo:")):
             self.record_chat_event({"role": "assistant", "text": raw.split(":", 1)[1].strip()})
         elif low.startswith("sys:"):
             self.record_chat_event({"role": "system", "text": raw.split(":", 1)[1].strip()})
@@ -4421,7 +4482,7 @@ class LauncherControlPanel(QDialog):
         lay.setContentsMargins(18, 16, 18, 16)
         lay.setSpacing(10)
 
-        title = QLabel("BRAHMA EVO CONTROL")
+        title = QLabel("EVO CONTROL")
         title.setFont(QFont("Segoe UI", 13, QFont.Weight.Bold))
         title.setStyleSheet("color: #FFFFFF; background: transparent; letter-spacing: 1px;")
         lay.addWidget(title)
@@ -4463,8 +4524,8 @@ class LauncherControlPanel(QDialog):
         self._startup_btn = mk_btn("Show Workspace On Startup", checkable=True, checked=bool(startup_workspace))
         self._show_icon_btn = mk_btn("Show Floating Icon")
         self._hide_icon_btn = mk_btn("Hide Floating Icon")
-        self._restart_btn = mk_btn("Restart Brahma Evo")
-        self._quit_btn = mk_btn("Quit Brahma Evo")
+        self._restart_btn = mk_btn("Restart Celestia")
+        self._quit_btn = mk_btn("Quit Celestia")
         self._open_app_btn = mk_btn("Open App")
         self._open_dev_btn = mk_btn("Open Developer Mode")
 
@@ -4507,7 +4568,7 @@ class LauncherControlPanel(QDialog):
         flay = QVBoxLayout(frame)
         flay.setContentsMargins(18, 16, 18, 16)
         flay.setSpacing(10)
-        lbl = QLabel("Hide Brahma Evo icon?")
+        lbl = QLabel("Hide Celestia icon?")
         lbl.setStyleSheet("color: #FFFFFF; background: transparent; font: 700 11pt 'Segoe UI';")
         sub = QLabel("You can restore it from the system tray.")
         sub.setStyleSheet("color: rgba(255,255,255,0.65); background: transparent;")
@@ -5227,30 +5288,15 @@ class BrahmaResultWing(QFrame):
     def _on_open_file_clicked(self):
         if self._active_file_path:
             p = Path(self._active_file_path).resolve()
-            if p.exists():
-                try:
-                    if sys.platform == "win32":
-                        os.startfile(str(p))
-                    else:
-                        import subprocess
-                        subprocess.Popen(["xdg-open", str(p)])
-                except Exception as e:
-                    print(f"[BrahmaResultWing] Open file error: {e}")
+            if p.exists() and not _open_native(p):
+                print(f"[BrahmaResultWing] Open file failed: {p}")
 
     def _on_reveal_clicked(self):
         if self._active_file_path:
             p = Path(self._active_file_path).resolve()
-            try:
-                import subprocess
-                if sys.platform == "win32":
-                    if p.exists():
-                        subprocess.Popen(["explorer.exe", f"/select,{str(p)}"])
-                    elif p.parent.exists():
-                        subprocess.Popen(["explorer.exe", str(p.parent)])
-                else:
-                    subprocess.Popen(["xdg-open", str(p.parent)])
-            except Exception as e:
-                print(f"[BrahmaResultWing] Reveal error: {e}")
+            target = p if p.exists() else p.parent
+            if not _open_native(target, reveal=p.exists()):
+                print(f"[BrahmaResultWing] Reveal error: {target}")
 
     def set_body(self, text: str):
         if hasattr(self, "_summary_lbl") and text:
@@ -5381,10 +5427,10 @@ class LogWidget(QScrollArea):
         tl = raw.lower()
         if tl.startswith("you:"):
             return "user", "You", raw[4:].strip()
-        if tl.startswith("brahma evo:"):
-            return "assistant", "Brahma Evo", raw[len("Brahma Evo:"):].strip()
-        if tl.startswith("brahma evo:"):
-            return "assistant", "Brahma Evo", raw[len("Brahma Evo:"):].strip()
+        if tl.startswith(("celestia:", "evo:", "brahma evo:")):
+            return "assistant", "Celestia", raw.split(":", 1)[1].strip()
+        if tl.startswith(("celestia:", "evo:", "brahma evo:")):
+            return "assistant", "Celestia", raw.split(":", 1)[1].strip()
         if tl.startswith("file:"):
             return "file", "File", raw[5:].strip()
         if tl.startswith("err:"):
@@ -5489,7 +5535,7 @@ class FileDropZone(QWidget):
 
     def _browse(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Select a file for Brahma Evo", str(Path.home()),
+            self, "Select a file for Celestia", str(Path.home()),
             "All Files (*.*);;"
             "Images (*.jpg *.jpeg *.png *.gif *.webp *.bmp *.svg);;"
             "Documents (*.pdf *.docx *.txt *.md *.pptx);;"
@@ -5806,7 +5852,7 @@ class SetupOverlay(QWidget):
 
     def _save_identity_and_next(self):
         identity.set_assistant_name(self._inp_ast.text().strip() or "Brahma")
-        identity.set_application_name(self._inp_app.text().strip() or "Brahma Evo")
+        identity.set_application_name(self._inp_app.text().strip() or "Celestia")
         self._stack.setCurrentIndex(2)
 
     # ── STAGE 1.2: Owner Profile ────────────────────────────────
@@ -6179,10 +6225,10 @@ class SetupOverlay(QWidget):
         intro_lay.setSpacing(12)
 
         self._intro_lines = []
-        for txt in ["Identity confirmed.", "Hello.", "I'm Brahma Evo.", "Ready whenever you are."]:
+        for txt in ["Identity confirmed.", "Hello.", "I'm Celestia.", "Ready whenever you are."]:
             lbl = QLabel(txt)
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            if txt == "I'm Brahma Evo.":
+            if txt == "I'm Celestia.":
                 lbl.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
                 lbl.setStyleSheet("color: #00e5ff; background: transparent; border: none;")
             else:
@@ -6194,7 +6240,7 @@ class SetupOverlay(QWidget):
 
         intro_lay.addSpacing(20)
 
-        self._launch_btn = QPushButton("Launch Brahma Evo →")
+        self._launch_btn = QPushButton("Launch Celestia →")
         self._launch_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._launch_btn.setFixedSize(220, 48)
         self._launch_btn.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
@@ -6541,7 +6587,7 @@ class SetupOverlay(QWidget):
         self._show_intro_final()
 
     def _show_intro_final(self):
-        """Show the Brahma Evo intro sequence."""
+        """Show the Celestia intro sequence."""
         page = self._stack.widget(6)
         lay = page.layout()
         self._intro_widget.setParent(None)
@@ -6705,7 +6751,7 @@ class CommandBar(QWidget):
         lay.setContentsMargins(6, 4, 6, 4)
         lay.setSpacing(6)
 
-        # Brahma Evo mini logo
+        # Celestia mini logo
         logo_frame = QFrame()
         logo_frame.setFixedSize(32, 32)
         logo_frame.setStyleSheet("""
@@ -6726,7 +6772,7 @@ class CommandBar(QWidget):
 
         # Input field
         self._input = QLineEdit()
-        self._input.setPlaceholderText("Tell Brahma Evo what to do...")
+        self._input.setPlaceholderText("Tell Celestia what to do...")
         self._input.setFont(QFont("Segoe UI", 9))
         self._input.setFixedHeight(32)
         self._input.setStyleSheet(f"""
@@ -6906,7 +6952,7 @@ class DeveloperModeDialog(QDialog):
         title.setStyleSheet(f"color: {C.PRI};")
         root.addWidget(title)
 
-        desc = QLabel("Pick a workspace folder Brahma Evo should use when building websites or other workspace-based tasks.")
+        desc = QLabel("Pick a workspace folder Celestia should use when building websites or other workspace-based tasks.")
         desc.setWordWrap(True)
         desc.setStyleSheet(f"color: {C.TEXT_DIM};")
         root.addWidget(desc)
@@ -7973,7 +8019,7 @@ class MeetingOverlay(QWidget):
         self._speech.setStyleSheet(f"color: {C.WHITE}; background: transparent;")
         lay.addWidget(self._speech)
 
-        self._answer = QLabel("Brahma Evo will show the live answer here.")
+        self._answer = QLabel("Celestia will show the live answer here.")
         self._answer.setWordWrap(True)
         self._answer.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
         self._answer.setStyleSheet(f"color: {C.WHITE}; background: transparent;")
@@ -8303,7 +8349,7 @@ class FloatingLauncher(QWidget):
 
     def _apply_state_style(self):
         self.setToolTip(
-            f"Brahma Evo ({self._status_line})\n"
+            f"Celestia ({self._status_line})\n"
             "• Single-click: Chat Workspace\n"
             "• Double-click: Open Full App\n"
             "• Drag: Move (Spring Snap)"
@@ -8337,7 +8383,7 @@ class FloatingLauncher(QWidget):
             }}
         """)
 
-        open_full = QAction("Open Brahma Evo (Full App)", self)
+        open_full = QAction("Open Celestia (Full App)", self)
         open_full.triggered.connect(lambda: self.action_requested.emit("open_app"))
         menu.addAction(open_full)
 
@@ -8528,7 +8574,7 @@ class MainWindow(QMainWindow):
         self.setWindowFlag(Qt.WindowType.Tool, False)
         self.setWindowFlag(Qt.WindowType.Window, True)
         self.setWindowIcon(self._make_window_icon())
-        self.setWindowTitle("Brahma Evo")
+        self.setWindowTitle("Celestia")
         self.setMinimumSize(_MIN_W, _MIN_H)
         self.resize(_DEFAULT_W, _DEFAULT_H)
 
@@ -8892,10 +8938,10 @@ class MainWindow(QMainWindow):
                 winreg.KEY_READ | winreg.KEY_WRITE,
             ) as key:
                 try:
-                    value, _ = winreg.QueryValueEx(key, "Brahma Evo")
+                    value, _ = winreg.QueryValueEx(key, "Brahma Celestia")
                     run_value = _startup_run_value()
                     if value != run_value:
-                        winreg.SetValueEx(key, "Brahma Evo", 0, winreg.REG_SZ, run_value)
+                        winreg.SetValueEx(key, "Brahma Celestia", 0, winreg.REG_SZ, run_value)
                     return bool(value)
                 except FileNotFoundError:
                     return False
@@ -8909,10 +8955,10 @@ class MainWindow(QMainWindow):
         try:
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, _startup_registry_key()) as key:
                 if enabled:
-                    winreg.SetValueEx(key, "Brahma Evo", 0, winreg.REG_SZ, run_value)
+                    winreg.SetValueEx(key, "Brahma Celestia", 0, winreg.REG_SZ, run_value)
                 else:
                     try:
-                        winreg.DeleteValue(key, "Brahma Evo")
+                        winreg.DeleteValue(key, "Brahma Celestia")
                     except FileNotFoundError:
                         pass
             return True
@@ -9202,7 +9248,7 @@ class MainWindow(QMainWindow):
 
     def _browse_attachment(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Attach a file to Brahma Evo", str(Path.home()),
+            self, "Attach a file to Celestia", str(Path.home()),
             "All Files (*.*);;"
             "Images (*.jpg *.jpeg *.png *.gif *.webp *.bmp *.svg);;"
             "Documents (*.pdf *.docx *.txt *.md *.pptx);;"
@@ -9304,7 +9350,7 @@ class MainWindow(QMainWindow):
                     self.on_chat_event({"role": "user", "text": user_msg, "source": source})
                 except Exception:
                     pass
-        if hasattr(self, "_result_card") and low.startswith("brahma evo:"):
+        if hasattr(self, "_result_card") and low.startswith(("celestia:", "evo:", "brahma evo:")):
             reply = raw.split(":", 1)[1].strip()
             self._result_card.set_body(reply[:80] + ("…" if len(reply) > 80 else ""))
             self._result_card.hide()
@@ -9508,7 +9554,7 @@ class MainWindow(QMainWindow):
             self._call_screening_dialog.close()
 
         dialog = QDialog(self)
-        dialog.setWindowTitle("Brahma Evo Call Screening")
+        dialog.setWindowTitle("Celestia Call Screening")
         dialog.setModal(False)
         dialog.setMinimumWidth(380)
         layout = QVBoxLayout(dialog)
@@ -9652,7 +9698,7 @@ class MainWindow(QMainWindow):
     def notify_phone_connected(self):
         if self._remote_overlay is not None:
             self._remote_overlay.mark_connected()
-        self._log_sig.emit("SYS: Phone connected to Brahma Evo remote.")
+        self._log_sig.emit("SYS: Phone connected to Celestia remote.")
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
@@ -9719,7 +9765,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_input"):
             ph_map = {
                 "LISTENING": "Listening... (or type your command)",
-                "SPEAKING": "Brahma Evo is responding...",
+                "SPEAKING": "Celestia is responding...",
                 "THINKING": "Brahma is thinking...",
                 "PROCESSING": "Processing request...",
                 "EXECUTING": "Executing action...",
@@ -9727,7 +9773,7 @@ class MainWindow(QMainWindow):
                 "MUTED": "Microphone muted — type command here...",
                 "SCANNING": "Scanning display...",
             }
-            self._input.setPlaceholderText(ph_map.get(state, "Ask Brahma Evo anything..."))
+            self._input.setPlaceholderText(ph_map.get(state, "Ask Celestia anything..."))
 
         # Update chat workspace footer status
         if hasattr(self, "_inline_workspace") and hasattr(self._inline_workspace, "_footer_status"):
@@ -9741,7 +9787,7 @@ class MainWindow(QMainWindow):
                 "MUTED": "● Voice input muted",
                 "SCANNING": "● Vision system active",
             }
-            self._inline_workspace._footer_status.setText(foot_map.get(state, "Brahma Evo is online"))
+            self._inline_workspace._footer_status.setText(foot_map.get(state, "Celestia is online"))
 
         if hasattr(self, "_status_chip"):
             chip_text = {
@@ -9767,13 +9813,13 @@ class MainWindow(QMainWindow):
             )
         if hasattr(self, "_task_card"):
             if state in ("THINKING", "PROCESSING", "EXECUTING", "WORKING"):
-                self._task_card.set_task("Working on it...", "Brahma Evo is processing your request.", 72)
+                self._task_card.set_task("Working on it...", "Celestia is processing your request.", 72)
             elif state == "SPEAKING":
-                self._task_card.set_task("Responding...", "Brahma Evo is speaking now.", 100)
+                self._task_card.set_task("Responding...", "Celestia is speaking now.", 100)
             elif state == "MUTED":
                 self._task_card.set_task("Microphone muted", "Voice input is paused.", 0)
             else:
-                self._task_card.set_task("Ready", "Brahma Evo is idle and ready.", 0)
+                self._task_card.set_task("Ready", "Celestia is idle and ready.", 0)
         if hasattr(self, "_result_card"):
             if state in ("THINKING", "PROCESSING", "EXECUTING", "WORKING"):
                 self._result_card.set_body("Action pending")
@@ -10025,7 +10071,7 @@ class MainWindow(QMainWindow):
                 self._floating_gesture_card.show()
             self.showNormal()
             self._apply_state("LISTENING")
-            self._log.append_log(f"SYS: Initialised. OS={os_name.upper()}. Brahma Evo online.")
+            self._log.append_log(f"SYS: Initialised. OS={os_name.upper()}. Celestia online.")
         except Exception as e:
             self._log.append_log(f"ERR: setup failed: {e}")
             traceback.print_exc()
@@ -10240,7 +10286,7 @@ class MainWindow(QMainWindow):
         row.setSpacing(12)
 
         self._input = QLineEdit()
-        self._input.setPlaceholderText("Ask Brahma Evo anything...")
+        self._input.setPlaceholderText("Ask Celestia anything...")
         self._input.setFont(QFont("Segoe UI", 10))
         self._input.setFixedHeight(50)
         self._input.setStyleSheet(f"""
@@ -10404,7 +10450,7 @@ class SystemConnectivitySidebar(QFrame):
         self._quick_actions = QVBoxLayout()
         self._quick_actions.setSpacing(10)
         lay.addLayout(self._quick_actions)
-        self._mk_quick_action("Γå╗ Restart Brahma Evo", QStyle.StandardPixmap.SP_BrowserReload, self._restart)
+        self._mk_quick_action("Γå╗ Restart Celestia", QStyle.StandardPixmap.SP_BrowserReload, self._restart)
         self._mk_quick_action("Γƒ│ Reload Configuration", QStyle.StandardPixmap.SP_BrowserReload, self._reload)
         self._mk_quick_action("≡ƒôü Open Data Folder", QStyle.StandardPixmap.SP_DirOpenIcon, self._open_data_folder)
         self._mk_quick_action("≡ƒôä View Logs", QStyle.StandardPixmap.SP_FileDialogDetailedView, self._view_logs)
@@ -10456,16 +10502,10 @@ class SystemConnectivitySidebar(QFrame):
                 pass
 
     def _open_data_folder(self):
-        try:
-            os.startfile(str(CONFIG_DIR))
-        except Exception:
-            pass
+        _open_native(CONFIG_DIR)
 
     def _view_logs(self):
-        try:
-            os.startfile(str(BASE_DIR))
-        except Exception:
-            pass
+        _open_native(BASE_DIR)
 
     def _check_updates(self):
         if self._bridge() and hasattr(self._bridge(), "write_log"):
@@ -10503,7 +10543,7 @@ class SettingsHubPage(QWidget):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lay.addWidget(title)
 
-        subtitle = QLabel("Select a section below to configure your Brahma Evo environment.")
+        subtitle = QLabel("Select a section below to configure your Celestia environment.")
         subtitle.setFont(QFont("Segoe UI", 12))
         subtitle.setStyleSheet(f"color: {C.TEXT_DIM};")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -10514,7 +10554,7 @@ class SettingsHubPage(QWidget):
         cards_lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         cards_data = [
-            ("Brahma Evo Home", "Configure smart home integrations", "🏠", 1),
+            ("Celestia Home", "Configure smart home integrations", "🏠", 1),
             ("Devices", "Manage and control connected hardware", "🔌", 2),
             ("System & Connect", "Configure providers and api preferences", "⚙️", 3)
         ]
@@ -10878,7 +10918,7 @@ class SystemConnectivityPage(QWidget):
 
 
         # Instagram Connect
-        ig_card = self._card("Instagram Connect", "Connect your personal Instagram account to allow Brahma Evo to manage your DMs.")
+        ig_card = self._card("Instagram Connect", "Connect your personal Instagram account to allow Celestia to manage your DMs.")
         ig_lay = ig_card.layout()
 
         self._ig_status_lbl = QLabel("Status: Checking...")
@@ -11025,7 +11065,7 @@ class SystemConnectivityPage(QWidget):
         app_row = QHBoxLayout()
         app_row.addWidget(QLabel("Application Name"))
         self._set_app_name = QLineEdit(identity.get_application_name())
-        self._set_app_name.textChanged.connect(lambda t: identity.set_application_name(t.strip() or "Brahma Evo"))
+        self._set_app_name.textChanged.connect(lambda t: identity.set_application_name(t.strip() or "Celestia"))
         app_row.addWidget(self._set_app_name)
         ilay.addLayout(app_row)
 
@@ -11063,7 +11103,7 @@ class SystemConnectivityPage(QWidget):
         self._gemini_row, self._gemini_status, self._gemini_key = self._provider_row(
             "Google Gemini",
             self._api_defaults.get("gemini_api_key", ""),
-            "gemini-2.5-flash",
+            "gemini-3.8-flash",
             "gemini",
         )
         self._or_row, self._or_status, self._or_key = self._provider_row(
@@ -11121,7 +11161,7 @@ class SystemConnectivityPage(QWidget):
         lay.addWidget(card)
 
         # Mobile connect
-        mobile = self._card("Mobile Connect", "Connect your phone and control Brahma Evo remotely.")
+        mobile = self._card("Mobile Connect", "Connect your phone and control Celestia remotely.")
         ml = mobile.layout()
         self._mobile_status = QLabel("Connection Status: Ready")
         self._mobile_phone = QLabel("Phone Name: Not connected")
@@ -11160,9 +11200,9 @@ class SystemConnectivityPage(QWidget):
         lay.addWidget(attention)
 
         # Startup
-        startup = self._card("Startup", "Use Brahma Evo with Windows startup preferences.")
+        startup = self._card("Startup", "Use Celestia with Windows startup preferences.")
         sl = startup.layout()
-        self._startup_launch_btn = self._mk_toggle("Launch Brahma Evo when Windows starts", bool(self._load_app_settings().get("show_workspace_on_startup", False)), self._toggle_startup_from_page)
+        self._startup_launch_btn = self._mk_toggle("Launch Celestia when Windows starts", bool(self._load_app_settings().get("show_workspace_on_startup", False)), self._toggle_startup_from_page)
         self._startup_minimized_btn = self._mk_toggle("Launch Minimized", bool(self._load_app_settings().get("launch_minimized", False)), self._toggle_launch_minimized)
         self._startup_updates_btn = self._mk_toggle("Check for updates on startup", bool(self._load_app_settings().get("check_updates_on_startup", True)), self._toggle_update_check)
         sl.addWidget(self._startup_launch_btn)
@@ -11171,7 +11211,7 @@ class SystemConnectivityPage(QWidget):
         lay.addWidget(startup)
 
         # Shortcuts & Pinning
-        shortcuts = self._card("Shortcuts & Pinning", "Create shortcuts and pin Brahma Evo to your Windows system.")
+        shortcuts = self._card("Shortcuts & Pinning", "Create shortcuts and pin Celestia to your Windows system.")
         shl = shortcuts.layout()
         
         btn_row = QHBoxLayout()
@@ -11188,7 +11228,7 @@ class SystemConnectivityPage(QWidget):
         lay.addWidget(shortcuts)
 
         # App Theme
-        theme_card = self._card("App Theme", "Select the primary color theme for Brahma Evo.")
+        theme_card = self._card("App Theme", "Select the primary color theme for Celestia.")
         tl = theme_card.layout()
         theme_row = QHBoxLayout()
         theme_row.addWidget(QLabel("Primary Color:"))
@@ -11236,7 +11276,7 @@ class SystemConnectivityPage(QWidget):
         al.addWidget(self._preview_progress)
         lay.addWidget(anim)
         # Discord bot
-        discord = self._card("Discord Bot", "Mirror Brahma Evo between the app and your server.")
+        discord = self._card("Discord Bot", "Mirror Celestia between the app and your server.")
         dl = discord.layout()
         self._discord_defaults = self._load_discord_settings()
         self._discord_status = QLabel("Bot Status: Offline")
@@ -11271,7 +11311,7 @@ class SystemConnectivityPage(QWidget):
         dl.addWidget(self._discord_msg)
         lay.addWidget(discord)
 
-        about = self._card("About Brahma Evo", "Brahma Evo information only.")
+        about = self._card("About Celestia", "Celestia information only.")
         ab = about.layout()
         about_grid = QGridLayout()
         about_grid.setHorizontalSpacing(22)
@@ -12042,7 +12082,7 @@ class SystemConnectivityPage(QWidget):
             "Steps to complete:\n"
             "1. Log in to Spotify in the browser window.\n"
             "2. Click 'Agree' to grant playback permissions.\n"
-            "3. Once redirected to callback, Brahma Evo will automatically detect authorization!"
+            "3. Once redirected to callback, Celestia will automatically detect authorization!"
         )
 
     def _poll_spotify_auth_status(self):
@@ -12320,7 +12360,7 @@ class SystemConnectivityPage(QWidget):
         box = self._card("Quick Actions", "")
         lay = box.layout()
         actions = [
-            ("Restart Brahma Evo", QStyle.StandardPixmap.SP_BrowserReload, self._restart_app),
+            ("Restart Celestia", QStyle.StandardPixmap.SP_BrowserReload, self._restart_app),
             ("Reload Configuration", QStyle.StandardPixmap.SP_BrowserReload, self._reload_config),
             ("Open Data Folder", QStyle.StandardPixmap.SP_DirOpenIcon, self._open_data_folder),
             ("View Logs", QStyle.StandardPixmap.SP_FileDialogDetailedView, self._view_logs),
@@ -12526,7 +12566,7 @@ class SystemConnectivityPage(QWidget):
             self._ctrl()._win._start_discord_bot()
             self._ctrl()._win._stop_discord_bot()
             self._discord_status.setText("Bot Status: Test sent")
-            self._discord_msg.setText("Connected as Brahma Evo#9649" if self._discord_token.text().strip() else "Bot Offline")
+            self._discord_msg.setText("Connected as Celestia" if self._discord_token.text().strip() else "Bot Offline")
 
     def _restart_discord_from_page(self):
         if self._ctrl() and hasattr(self._ctrl(), "_win"):
@@ -12547,16 +12587,10 @@ class SystemConnectivityPage(QWidget):
             self.refresh()
 
     def _open_data_folder(self):
-        try:
-            os.startfile(str(CONFIG_DIR))
-        except Exception:
-            pass
+        _open_native(CONFIG_DIR)
 
     def _view_logs(self):
-        try:
-            os.startfile(str(BASE_DIR))
-        except Exception:
-            pass
+        _open_native(BASE_DIR)
 
     def _check_updates(self):
         if self._ctrl() and hasattr(self._ctrl(), "write_log"):
@@ -12616,7 +12650,7 @@ class SystemConnectivityPage(QWidget):
         token = (discord.get("bot_token") or "").strip()
         if enabled and token:
             self._discord_status.setText("Bot Status: Online")
-            self._discord_msg.setText("Connected as Brahma Evo#9649")
+            self._discord_msg.setText("Connected as Celestia")
         elif token:
             self._discord_status.setText("Bot Status: Offline")
             self._discord_msg.setText("Bot Offline")
@@ -12673,7 +12707,7 @@ class SystemConnectivityPage(QWidget):
                 desktop_dir = Path(os.path.expanduser("~")) / "Desktop"
                 
             desktop_dir.mkdir(parents=True, exist_ok=True)
-            shortcut_path = desktop_dir / "Brahma Evo - Premium.lnk"
+            shortcut_path = desktop_dir / "Celestia - Premium.lnk"
             
             # Base variables
             base_dir = Path(os.path.abspath("."))
@@ -12703,7 +12737,7 @@ class SystemConnectivityPage(QWidget):
                 f"$Shortcut.Arguments = '{_ps_escape(shortcut_args)}'",
                 f"$Shortcut.WorkingDirectory = '{_ps_escape(str(base_dir))}'",
                 "$Shortcut.WindowStyle = 7",
-                "$Shortcut.Description = 'Launch Brahma Evo - Premium'",
+                "$Shortcut.Description = 'Launch Celestia - Premium'",
                 f"if ('{_ps_escape(icon_value)}') {{ $Shortcut.IconLocation = '{_ps_escape(icon_value)},0' }}",
                 "$Shortcut.Save()",
             ])
@@ -12763,9 +12797,9 @@ class SystemConnectivityPage(QWidget):
             )
             
             if res.returncode == 0:
-                return True, "Brahma Evo has been pinned to your Taskbar!"
+                return True, "Celestia has been pinned to your Taskbar!"
             else:
-                return False, "Windows restricts programmatic taskbar pinning. Please right-click the 'Brahma Evo - Premium.lnk' shortcut on your Desktop and select 'Pin to taskbar', or drag it directly onto your taskbar."
+                return False, "Windows restricts programmatic taskbar pinning. Please right-click the 'Celestia - Premium.lnk' shortcut on your Desktop and select 'Pin to taskbar', or drag it directly onto your taskbar."
         except Exception as e:
             return False, f"Error pinning to taskbar: {e}"
 
@@ -12867,7 +12901,7 @@ class SmartDevicesSection(QFrame):
         empty_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         empty_desc.setFont(QFont("Segoe UI", 8))
         empty_desc.setStyleSheet(f"color: {C.TEXT_DIM};")
-        empty_btn = QPushButton("Open Brahma Evo Home")
+        empty_btn = QPushButton("Open Celestia Home")
         empty_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         empty_btn.setFixedWidth(160)
         empty_btn.setStyleSheet(f"""
@@ -14071,7 +14105,7 @@ class BrahmaUI:
         self._app = QApplication.instance() or QApplication(sys.argv)
         self._app.setStyle("Fusion")
         self._app.setQuitOnLastWindowClosed(False)
-        self._app.setApplicationDisplayName("Brahma Evo")
+        self._app.setApplicationDisplayName("Celestia")
         self._app.setWindowIcon(self._make_app_icon())
         try:
             current_store = workspace_store()
@@ -14128,7 +14162,7 @@ class BrahmaUI:
         except Exception:
             pass
         self._tray = QSystemTrayIcon(self._make_app_icon(), self._app)
-        self._tray.setToolTip("Brahma Evo")
+        self._tray.setToolTip("Celestia")
         self._tray.activated.connect(self._on_tray_activated)
         self._tray.setContextMenu(self._build_tray_menu())
         self._tray.show()

@@ -234,6 +234,8 @@ def _contains_any(hay: str, needles: tuple[str, ...]) -> bool:
 
 
 def _window_title(hwnd: int) -> str:
+    if platform.system() != "Windows":
+        return ""
     buf = ctypes.create_unicode_buffer(512)
     try:
         ctypes.windll.user32.GetWindowTextW(hwnd, buf, len(buf))
@@ -243,6 +245,8 @@ def _window_title(hwnd: int) -> str:
 
 
 def _window_class(hwnd: int) -> str:
+    if platform.system() != "Windows":
+        return ""
     buf = ctypes.create_unicode_buffer(256)
     try:
         ctypes.windll.user32.GetClassNameW(hwnd, buf, len(buf))
@@ -252,6 +256,8 @@ def _window_class(hwnd: int) -> str:
 
 
 def _window_pid(hwnd: int) -> int:
+    if platform.system() != "Windows":
+        return 0
     pid = wintypes.DWORD()
     try:
         ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
@@ -261,33 +267,55 @@ def _window_pid(hwnd: int) -> int:
 
 
 def _enum_visible_windows() -> list[dict]:
-    results: list[dict] = []
-    user32 = ctypes.windll.user32
-    enum_proc = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
-
-    @enum_proc
-    def callback(hwnd, lparam):
+    # Windows: Win32 EnumWindows (original behaviour, unchanged).
+    if platform.system() == "Windows":
+        results: list[dict] = []
         try:
-            if not user32.IsWindowVisible(hwnd):
-                return True
-            title = _window_title(hwnd)
-            if not title:
-                return True
-            results.append({
-                "hwnd": int(hwnd),
-                "title": title,
-                "class": _window_class(hwnd),
-                "pid": _window_pid(hwnd),
-            })
+            user32 = ctypes.windll.user32
+            enum_proc = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+        except Exception:
+            return []
+
+        @enum_proc
+        def callback(hwnd, lparam):
+            try:
+                if not user32.IsWindowVisible(hwnd):
+                    return True
+                title = _window_title(hwnd)
+                if not title:
+                    return True
+                results.append({
+                    "hwnd": int(hwnd),
+                    "title": title,
+                    "class": _window_class(hwnd),
+                    "pid": _window_pid(hwnd),
+                })
+            except Exception:
+                pass
+            return True
+
+        try:
+            user32.EnumWindows(callback, 0)
         except Exception:
             pass
-        return True
+        return results
 
+    # macOS/Linux: best-effort via pygetwindow (titles only, no hwnd/pid).
+    # Call-detection still works on title keywords; nothing Windows was removed.
     try:
-        user32.EnumWindows(callback, 0)
+        import pygetwindow as gw
+        out: list[dict] = []
+        for w in gw.getAllWindows():
+            try:
+                title = _norm(getattr(w, "title", "") or "")
+                if not title:
+                    continue
+                out.append({"hwnd": 0, "title": title, "class": "", "pid": 0})
+            except Exception:
+                continue
+        return out
     except Exception:
-        pass
-    return results
+        return []
 
 
 def _extract_preview(lines: list[str], app: str) -> str:
@@ -310,6 +338,7 @@ def _extract_preview(lines: list[str], app: str) -> str:
 
 _current_player_alias = None
 _current_audio_path = None
+_current_audio_proc = None
 _speech_sink: Callable[[str], None] | None = None
 
 
@@ -318,14 +347,22 @@ def set_speech_sink(sink: Callable[[str], None] | None) -> None:
     _speech_sink = sink
 
 def _cleanup_current_audio() -> None:
-    global _current_player_alias, _current_audio_path
+    global _current_player_alias, _current_audio_path, _current_audio_proc
+    if _current_audio_proc is not None:
+        try:
+            _current_audio_proc.terminate()
+        except Exception:
+            pass
+        _current_audio_proc = None
     if _current_player_alias is not None:
         try:
-            ctypes.windll.winmm.mciSendStringW(f"stop {_current_player_alias}", None, 0, None)
+            if platform.system() == "Windows":
+                ctypes.windll.winmm.mciSendStringW(f"stop {_current_player_alias}", None, 0, None)
         except Exception:
             pass
         try:
-            ctypes.windll.winmm.mciSendStringW(f"close {_current_player_alias}", None, 0, None)
+            if platform.system() == "Windows":
+                ctypes.windll.winmm.mciSendStringW(f"close {_current_player_alias}", None, 0, None)
         except Exception:
             pass
         _current_player_alias = None
@@ -340,7 +377,7 @@ def _cleanup_current_audio() -> None:
 
 
 def _speak_edge_native(text: str) -> None:
-    global _current_player_alias, _current_audio_path
+    global _current_player_alias, _current_audio_path, _current_audio_proc
     text = (text or "").strip()
     if not text:
         return
@@ -365,6 +402,34 @@ def _speak_edge_native(text: str) -> None:
     except Exception as exc:  # pragma: no cover
         print(f"[AttentionMonitor] Edge TTS generation failed: {exc}")
         _cleanup_current_audio()
+        return
+
+    if platform.system() != "Windows":
+        # macOS/Linux: play the same edge_tts mp3 with a native player.
+        # Windows MCI path below is unchanged.
+        import subprocess
+        try:
+            if platform.system() == "Darwin":
+                proc = subprocess.Popen(["afplay", audio_path])
+                _current_audio_proc = proc
+                _current_audio_path = audio_path
+                proc.wait()
+            else:
+                for cmd in (["mpg123", "-q", audio_path], ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", audio_path], ["aplay", audio_path]):
+                    try:
+                        proc = subprocess.Popen(cmd)
+                        _current_audio_proc = proc
+                        _current_audio_path = audio_path
+                        proc.wait()
+                        break
+                    except FileNotFoundError:
+                        continue
+                else:
+                    print("[AttentionMonitor] No audio player found (mpg123/ffplay/aplay).")
+        except Exception as exc:  # pragma: no cover
+            print(f"[AttentionMonitor] Edge TTS playback failed: {exc}")
+        finally:
+            _cleanup_current_audio()
         return
 
     # Resolve 8.3 short path to guarantee 100% MCI compatibility on Windows 10/11
@@ -422,7 +487,42 @@ def stop_native_speech() -> None:
     _cleanup_current_audio()
 
 
+_MAC_APP_NAMES: dict[str, tuple[str, ...]] = {
+    # canonical app -> likely macOS application names to try with `open -a`.
+    "discord": ("Discord",),
+    "whatsapp": ("WhatsApp",),
+    "telegram": ("Telegram",),
+    "signal": ("Signal",),
+    "skype": ("Skype",),
+    "zoom": ("zoom.us",),
+    "teams": ("Microsoft Teams",),
+    "phone link": ("Phone Link",),
+    "messenger": ("Messenger",),
+    "instagram": ("Instagram",),
+    "facebook": ("Facebook",),
+    "slack": ("Slack",),
+    "gmail": ("Google Chrome", "Safari", "Mail"),
+    "mail": ("Mail",),
+}
+
+
 def _focus_window_by_app(app: str) -> bool:
+    if platform.system() != "Windows":
+        # macOS/Linux: bring the app forward so the Enter/Escape keystroke
+        # fallback in handle_call_action lands in the right place.
+        key = _norm(app)
+        if platform.system() == "Darwin":
+            for name in _MAC_APP_NAMES.get(key, (app,)):
+                try:
+                    import subprocess
+                    r = subprocess.run(["open", "-a", name],
+                                       capture_output=True, timeout=5)
+                    if r.returncode == 0:
+                        return True
+                except Exception:
+                    continue
+            return False
+        return False
     if Desktop is None:
         return False
     try:
@@ -546,9 +646,15 @@ class AttentionMonitor:
         self._running = False
 
     def _loop(self) -> None:
-        if not self._db.exists():
-            print(f"[AttentionMonitor] notification DB not found: {self._db}")
-            return
+        if platform.system() == "Windows":
+            if not self._db.exists():
+                print(f"[AttentionMonitor] notification DB not found: {self._db}")
+                return
+        else:
+            # macOS/Linux have no WPN toast DB — window-title polling only.
+            # (Windows toast path below is unchanged.)
+            if not self._db.exists():
+                print(f"[AttentionMonitor] Windows notification DB not present ({self._db}); using window titles only.")
         while self._running:
             try:
                 self._poll_once()
@@ -573,10 +679,13 @@ class AttentionMonitor:
 
     def _poll_once(self) -> None:
         now = time.time()
-        self._poll_toasts(now)
+        if platform.system() == "Windows":
+            self._poll_toasts(now)
         self._poll_windows(now)
 
     def _poll_toasts(self, now: float) -> None:
+        if platform.system() != "Windows":
+            return
         with sqlite3.connect(self._db, timeout=1.5) as con:
             con.row_factory = sqlite3.Row
             cur = con.cursor()

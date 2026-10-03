@@ -34,8 +34,8 @@ def _call_gemini_json(prompt: str, system_instruction: str) -> Optional[dict]:
             client = genai.Client(api_key=gemini_key)
 
             models_to_try = [
+                "gemini-3.8-flash",
                 "gemini-3.1-flash-lite",
-                "gemini-3.5-flash-lite",
                 "gemini-2.5-flash-lite",
                 "gemini-flash-latest",
                 "gemini-2.5-flash",

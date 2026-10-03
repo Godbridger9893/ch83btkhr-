@@ -1,5 +1,5 @@
 """
-Brahma AI Evo - Circuit Assembler & Hardware Vision Architect.
+Celestia - Circuit Assembler & Hardware Vision Architect.
 Analyzes electronic components on screen or from voice input, resolves pin-to-pin wiring,
 safety warnings, and assembly steps, and launches the Holographic Circuit HUD.
 """
@@ -399,7 +399,7 @@ def solve_circuit_with_ai(prompt: str, image_bytes: Optional[bytes] = None) -> O
             )
 
         resp = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.8-flash",
             contents=contents,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,

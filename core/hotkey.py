@@ -17,10 +17,11 @@ Zero new dependencies, best available mechanism per platform:
   needs the release too, and it needs to work while another application has
   focus. Polling two virtual-key codes 30 times a second is a rounding error of
   CPU and needs no message loop.
-* **macOS / Linux** — no portable way to read global key state without pulling
-  in a new package or asking for accessibility permissions, so the chord is
-  bound as an application shortcut instead: it works whenever the assistant's
-  window has focus. `scope` reports which of the two you got, so the UI can say
+* **macOS / Linux** — global chord via `pynput` when it is installed
+  (`pip install pynput`, plus Accessibility permission on macOS): works while
+  any application has focus. Without `pynput` the chord is bound as an
+  application shortcut instead: it works whenever the assistant's window has
+  focus. `scope` reports which of the two you got, so the UI can say
   so honestly rather than pretending.
 
 The class never raises. If the platform hook cannot be installed it simply
@@ -79,6 +80,7 @@ class PushToTalk:
         self._on_change = on_change
         self._chord = tuple(chord)
         self._thread: threading.Thread | None = None
+        self._listener = None
         self._stop = threading.Event()
         self._held = False
         self._scope = "window"
@@ -109,6 +111,8 @@ class PushToTalk:
             self._thread = threading.Thread(
                 target=self._poll_loop, name="push-to-talk", daemon=True)
             self._thread.start()
+        elif _OS in ("Darwin", "Linux") and self._start_pynput():
+            self._scope = "global"
         else:
             self._scope = "window"
         return self._scope
@@ -118,6 +122,12 @@ class PushToTalk:
         t, self._thread = self._thread, None
         if t is not None and t.is_alive():
             t.join(timeout=1.0)
+        listener, self._listener = getattr(self, "_listener", None), None
+        if listener is not None:
+            try:
+                listener.stop()
+            except Exception:
+                pass
         self._set_held(False)
 
     # ── the windowed fallback drives this directly ──────────────────────────
@@ -135,6 +145,67 @@ class PushToTalk:
             return all(k in _VK for k in self._chord)
         except Exception:
             return False
+
+    # ── pynput global hook (macOS / Linux, optional dependency) ──────────
+
+    _PNP_NAME = {
+        "ctrl": "ctrl", "shift": "shift", "alt": "alt",
+        "space": "space", "f8": "f8", "f9": "f9", "f10": "f10",
+        "capslock": "caps_lock", "insert": "insert",
+    }
+
+    def _start_pynput(self) -> bool:
+        """System-wide chord listener via pynput. Never raises."""
+        try:
+            from pynput import keyboard as _kb
+        except Exception:
+            return False
+        try:
+            wanted = set()
+            for k in self._chord:
+                name = self._PNP_NAME.get(k)
+                if name is None:
+                    return False
+                wanted.add(getattr(_kb.Key, name, name))
+        except Exception:
+            return False
+
+        pressed: set = set()
+
+        def _coerce(key):
+            try:
+                if isinstance(key, _kb.KeyCode):
+                    return (key.char or "").lower() or None
+                return key
+            except Exception:
+                return None
+
+        def on_press(key):
+            k = _coerce(key)
+            if k is None:
+                return
+            first = k not in pressed
+            pressed.add(k)
+            # OS key-repeat re-fires press while held; only the edge counts.
+            if first and wanted.issubset(pressed):
+                self._set_held(True)
+
+        def on_release(key):
+            k = _coerce(key)
+            if k is None:
+                return
+            pressed.discard(k)
+            if not wanted.issubset(pressed):
+                self._set_held(False)
+
+        try:
+            listener = _kb.Listener(on_press=on_press, on_release=on_release)
+            listener.daemon = True
+            listener.start()
+        except Exception:
+            return False
+        self._listener = listener
+        return True
 
     def _set_held(self, held: bool) -> None:
         if held == self._held:

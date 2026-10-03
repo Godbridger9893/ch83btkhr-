@@ -58,13 +58,13 @@ class InstallThread(QThread):
             self.status.emit("Creating shortcuts...")
             
             # Create Desktop Shortcut
-            exe_path = os.path.join(self.target_dir, 'BrahmaEvo.exe')
+            exe_path = os.path.join(self.target_dir, 'Celestia.exe')
             if os.path.exists(exe_path):
                 shell = win32com.client.Dispatch("WScript.Shell")
                 
                 # Dynamically resolve Desktop path (handles OneDrive, moved folders, etc.)
                 desktop = shell.SpecialFolders("Desktop")
-                shortcut_path = os.path.join(desktop, "Brahma Evo.lnk")
+                shortcut_path = os.path.join(desktop, "Celestia.lnk")
                 
                 try:
                     shortcut = shell.CreateShortCut(shortcut_path)
@@ -79,7 +79,7 @@ class InstallThread(QThread):
                 # Start menu (dynamically resolve Programs path)
                 try:
                     start_menu = shell.SpecialFolders("Programs")
-                    shortcut_path_sm = os.path.join(start_menu, "Brahma Evo.lnk")
+                    shortcut_path_sm = os.path.join(start_menu, "Celestia.lnk")
                     shortcut_sm = shell.CreateShortCut(shortcut_path_sm)
                     shortcut_sm.Targetpath = exe_path
                     shortcut_sm.WorkingDirectory = self.target_dir
@@ -100,7 +100,7 @@ class InstallThread(QThread):
 class InstallWizard(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Brahma Evo - Setup")
+        self.setWindowTitle("Celestia - Setup")
         self.resize(800, 500)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
@@ -181,7 +181,7 @@ class InstallWizard(QWidget):
         box_layout = QVBoxLayout(self.content_box)
         
         # Title
-        title = QLabel("Brahma Evo Setup")
+        title = QLabel("Celestia Setup")
         title.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         box_layout.addWidget(title)
@@ -194,13 +194,13 @@ class InstallWizard(QWidget):
         self.page1.setStyleSheet("background: transparent; border: none;")
         p1_layout = QVBoxLayout(self.page1)
         
-        desc = QLabel("Welcome to the Brahma Evo Setup Wizard.\nClick Install to continue.")
+        desc = QLabel("Welcome to the Celestia Setup Wizard.\nClick Install to continue.")
         desc.setFont(QFont("Segoe UI", 12))
         desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         p1_layout.addWidget(desc)
         
         # Default Path
-        self.install_path = os.path.join(os.environ.get('LOCALAPPDATA', os.environ['USERPROFILE']), 'Brahma_Evo')
+        self.install_path = os.path.join(os.environ.get('LOCALAPPDATA', os.environ['USERPROFILE']), 'Celestia')
         path_label = QLabel(f"Destination Folder: {self.install_path}")
         path_label.setFont(QFont("Segoe UI", 10))
         path_label.setStyleSheet("color: #aaa;")
@@ -247,7 +247,7 @@ class InstallWizard(QWidget):
         lbl_finish.setAlignment(Qt.AlignmentFlag.AlignCenter)
         p3_layout.addWidget(lbl_finish)
         
-        btn_finish = QPushButton("Launch Brahma Evo")
+        btn_finish = QPushButton("Launch Celestia")
         btn_finish.clicked.connect(self.launch_app)
         
         btn_close = QPushButton("Close")
@@ -281,7 +281,7 @@ class InstallWizard(QWidget):
 
     def start_installation(self):
         self.stacked_widget.setCurrentIndex(1)
-        source_dir = os.path.join(self.base_dir, 'BrahmaEvo')
+        source_dir = os.path.join(self.base_dir, 'Celestia')
         if not os.path.exists(source_dir):
             self.lbl_status.setText(f"Error: Payload missing.\n{source_dir}")
             return
@@ -301,7 +301,7 @@ class InstallWizard(QWidget):
         self.lbl_status.setStyleSheet("color: #ff4444;")
         
     def launch_app(self):
-        exe_path = os.path.join(self.install_path, 'BrahmaEvo.exe')
+        exe_path = os.path.join(self.install_path, 'Celestia.exe')
         if os.path.exists(exe_path):
             os.startfile(exe_path)
         self.close()

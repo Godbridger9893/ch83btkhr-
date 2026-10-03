@@ -1,5 +1,5 @@
 """
-Brahma AI Evo - Holographic Hardware Assembler & Interactive Circuit HUD.
+Celestia - Holographic Hardware Assembler & Interactive Circuit HUD.
 Compact, elegant in-app popup overlay that visually shows pin-to-pin wiring
 between microcontroller and sensors, matching the user's reference diagram.
 """

@@ -61,9 +61,12 @@ def _get_chrome_path() -> str | None:
         r"C:\Program Files\Google\Chrome\Application\chrome.exe",
         r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
         os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        str(Path.home() / "Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
         shutil.which("chrome"),
         shutil.which("google-chrome"),
         shutil.which("google-chrome-stable"),
+        shutil.which("chromium"),
     ]
     for p in candidates:
         if p and os.path.exists(p):
@@ -78,12 +81,69 @@ def _get_spotify_app_path() -> str | None:
         os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\WindowsApps\Spotify.exe"),
         os.path.expandvars(r"%LOCALAPPDATA%\Spotify\Spotify.exe"),
         r"C:\Program Files\Spotify\Spotify.exe",
+        "/Applications/Spotify.app/Contents/MacOS/Spotify",
+        str(Path.home() / "Applications/Spotify.app/Contents/MacOS/Spotify"),
         shutil.which("spotify"),
     ]
     for p in candidates:
         if p and os.path.exists(p):
             return p
     return None
+
+
+def _open_spotify_uri(uri: str) -> bool:
+    """Opens a spotify: URI in the desktop app (or browser fallback)."""
+    try:
+        if sys.platform == "win32":
+            os.startfile(uri)
+            return True
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", uri],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+        subprocess.Popen(["xdg-open", uri],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True
+    except Exception:
+        return False
+
+
+def _mac_media_command(action: str) -> bool:
+    """Controls Spotify / Apple Music on macOS via AppleScript. Returns True if sent."""
+    if sys.platform != "darwin":
+        return False
+    # Prefer Spotify when it is running, else fall back to Music.app.
+    running = ""
+    try:
+        running = subprocess.run(
+            ["osascript", "-e", 'tell application "System Events" to get name of every process'],
+            capture_output=True, text=True, timeout=5,
+        ).stdout.lower()
+    except Exception:
+        pass
+    targets = []
+    if "spotify" in running:
+        targets.append("Spotify")
+    targets += ["Music", "Spotify"]
+    verbs = {
+        "playpause": ("playpause", "playpause"),
+        "nexttrack": ("next track", "next track"),
+        "prevtrack": ("previous track", "previous track"),
+    }
+    verb = verbs.get(action.lower(), (None, None))[0]
+    if not verb:
+        return False
+    for app in targets:
+        try:
+            r = subprocess.run(
+                ["osascript", "-e", f'tell application "{app}" to {verb}'],
+                capture_output=True, timeout=5,
+            )
+            if r.returncode == 0:
+                return True
+        except Exception:
+            continue
+    return False
 
 
 def _open_url_in_chrome(url: str) -> bool:
@@ -106,6 +166,9 @@ def _open_url_in_chrome(url: str) -> bool:
 
 def _press_media_key(key_name: str) -> bool:
     """Sends hardware virtual media key codes."""
+    # macOS first: direct control of Spotify / Music.app (no accessibility needed).
+    if _mac_media_command(key_name):
+        return True
     try:
         import ctypes
         VK_MEDIA_NEXT_TRACK = 0xB0
@@ -132,12 +195,39 @@ def _press_media_key(key_name: str) -> bool:
     except Exception as e:
         print(f"[Music] Keybd event error: {e}")
 
+    # pyautogui fallback (this build supports playpause + volume keys, but no
+    # next/previous-track keys — those are covered by the native paths above).
+    _PYAUTO_KEYS = {
+        "playpause": "playpause",
+        "volumemute": "volumemute",
+        "volumedown": "volumedown",
+        "volumeup": "volumeup",
+    }
     try:
         import pyautogui
-        pyautogui.press(key_name)
-        return True
+        mapped = _PYAUTO_KEYS.get(key_name.lower())
+        if mapped:
+            pyautogui.press(mapped)
+            return True
     except Exception:
         pass
+
+    # Linux last resort: playerctl talks to any MPRIS player (Spotify, VLC, ...).
+    if sys.platform.startswith("linux") and shutil.which("playerctl"):
+        _PLAYERCTL = {
+            "playpause": ["play-pause"],
+            "nexttrack": ["next"],
+            "prevtrack": ["previous"],
+        }
+        args = _PLAYERCTL.get(key_name.lower())
+        if args:
+            try:
+                subprocess.run(["playerctl"] + args,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                               timeout=5)
+                return True
+            except Exception:
+                pass
 
     return False
 
@@ -269,10 +359,12 @@ def spotify_controller(
         # If Desktop Spotify App exists, launch it
         if spotify_app:
             try:
-                os.startfile(f"spotify:search:{encoded}")
-                time.sleep(1.2)
-                _press_media_key("playpause")
-                return f"Playing '{query}' on Spotify."
+                if _open_spotify_uri(f"spotify:search:{encoded}"):
+                    time.sleep(1.2)
+                    # Don't steal playback on macOS — the URI open already starts it.
+                    if sys.platform == "win32":
+                        _press_media_key("playpause")
+                    return f"Playing '{query}' on Spotify."
             except Exception:
                 pass
 
@@ -283,7 +375,7 @@ def spotify_controller(
             _open_url_in_chrome(direct_url)
             if player:
                 try:
-                    player.write_log(f"Brahma Evo: Playing '{query}' in Google Chrome")
+                    player.write_log(f"Celestia: Playing '{query}' in Google Chrome")
                 except Exception:
                     pass
             return f"Playing '{query}' in Google Chrome."
@@ -476,5 +568,5 @@ def _spotify_mcp_action(parameters: dict) -> str:
 
 
 def spotify_mcp_controller(parameters: dict | None = None) -> str:
-    """Explicit Spotify MCP entry point for the optional Evo feature."""
+    """Explicit Spotify MCP entry point for the optional Celestia feature."""
     return _spotify_mcp_action(parameters or {})

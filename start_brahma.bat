@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-title Brahma Evo - Launcher
+title Celestia - Launcher
 cd /d "%~dp0"
 
 color 0E

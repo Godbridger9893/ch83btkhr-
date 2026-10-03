@@ -1,6 +1,7 @@
 #computer_control.py
 import io
 import json
+import platform
 import re
 import string
 import subprocess
@@ -40,7 +41,14 @@ def _load_config() -> dict:
         return {}
 
 def _get_os() -> str:
-    return _load_config().get("os_system", "windows").lower()
+    """'windows' | 'mac' | 'linux' — detected live, never trusted from config
+    (old configs defaulted os_system to 'windows', breaking every Mac)."""
+    system = platform.system()
+    if system == "Windows":
+        return "windows"
+    if system == "Darwin":
+        return "mac"
+    return "linux"
 
 _SAFE_SCREENSHOT_ROOTS = (
     Path.home(),

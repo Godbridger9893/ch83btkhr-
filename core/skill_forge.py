@@ -269,7 +269,7 @@ Skill Architecture Guidelines:
      c) For web images/GIFs: Attempt downloading using safe SSL context or requests, but if download fails or if network is unavailable, IMMEDIATELY fall back to drawing a crisp high-tech visual deliverable using PIL/matplotlib so execution always succeeds and displays on screen.
      d) Return format for visuals:
         `return {'image_path': image_path, 'title': '...', 'summary': '...'}`
-        This triggers Brahma Evo's HUD Result Wing to immediately display the card!
+         This triggers Celestia's HUD Result Wing to immediately display the card!
 6. Output Format:
    Output MUST be clean JSON with exact structure:
 {
@@ -314,7 +314,7 @@ Additional Context: {context_hints}
             try:
                 from google import genai
                 g_client = genai.Client(api_key=gemini_key, http_options={"api_version": "v1beta"})
-                for model_name in ("gemini-2.5-flash-lite", "gemini-3.6-flash", "gemini-2.5-flash", "gemini-flash-latest"):
+                for model_name in ("gemini-3.8-flash", "gemini-2.5-flash-lite", "gemini-3.6-flash", "gemini-2.5-flash", "gemini-flash-latest"):
                     try:
                         resp = g_client.models.generate_content(
                             model=model_name,
@@ -383,7 +383,7 @@ Critical Repair Instructions:
             try:
                 from google import genai
                 g_client = genai.Client(api_key=gemini_key, http_options={"api_version": "v1beta"})
-                for model_name in ("gemini-2.5-flash-lite", "gemini-3.6-flash", "gemini-2.5-flash", "gemini-flash-latest"):
+                for model_name in ("gemini-3.8-flash", "gemini-2.5-flash-lite", "gemini-3.6-flash", "gemini-2.5-flash", "gemini-flash-latest"):
                     try:
                         resp = g_client.models.generate_content(
                             model=model_name,

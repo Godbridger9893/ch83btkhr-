@@ -1,11 +1,31 @@
 from core.user_paths import get_user_data_dir
 import os
+import sys as _sys
 
-# Hardware acceleration & WebGL flags for smooth 180fps+ rendering in Chromium
-os.environ.setdefault(
-    "QTWEBENGINE_CHROMIUM_FLAGS",
-    "--enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist --enable-accelerated-2d-canvas --enable-webgl --enable-webgl2-compute-context --disable-frame-rate-limit --disable-gpu-vsync --num-raster-threads=4 --use-angle=d3d11 --disable-gpu-driver-bug-workarounds"
-)
+# Hardware acceleration & WebGL flags for Chromium (platform-specific).
+# Windows keeps the original 180fps+ tuning; macOS must NOT use d3d11
+# (Chromium aborts with "angle=d3d11 not found", then zsh reports
+# `trace trap`). Linux uses a conservative default.
+if "QTWEBENGINE_CHROMIUM_FLAGS" not in os.environ:
+    if _sys.platform == "win32":
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+            "--enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist "
+            "--enable-accelerated-2d-canvas --enable-webgl --enable-webgl2-compute-context "
+            "--disable-frame-rate-limit --disable-gpu-vsync --num-raster-threads=4 "
+            "--use-angle=d3d11 --disable-gpu-driver-bug-workarounds"
+        )
+    elif _sys.platform == "darwin":
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+            "--enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist "
+            "--enable-accelerated-2d-canvas --enable-webgl --enable-webgl2-compute-context "
+            "--num-raster-threads=4 --use-gl=angle --use-angle=metal"
+        )
+    else:
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+            "--enable-gpu-rasterization --enable-zero-copy --ignore-gpu-blocklist "
+            "--enable-accelerated-2d-canvas --enable-webgl --enable-webgl2-compute-context "
+            "--num-raster-threads=4 --use-gl=angle --use-angle=opengl"
+        )
 
 try:
     from PyQt6.QtCore import QCoreApplication, Qt
@@ -119,7 +139,7 @@ def get_base_dir():
 BASE_DIR        = get_base_dir()
 API_CONFIG_PATH = get_user_data_dir() / "config" / "api_keys.json"
 PROMPT_PATH     = BASE_DIR / "core" / "prompt.txt"
-STARTUP_LOG     = Path(os.environ.get("LOCALAPPDATA", str(BASE_DIR))) / "Brahma Evo" / "startup.log"
+STARTUP_LOG     = Path(os.environ.get("LOCALAPPDATA", str(BASE_DIR))) / "Brahma Celestia" / "startup.log"
 LIVE_MODEL          = "models/gemini-2.5-flash-native-audio-preview-12-2025"
 CHANNELS            = 1
 SEND_SAMPLE_RATE    = 16000
@@ -167,7 +187,7 @@ def _ensure_desktop_shortcut() -> None:
             desktop_dir = Path(os.path.expanduser("~")) / "Desktop"
             
         desktop_dir.mkdir(parents=True, exist_ok=True)
-        shortcut_path = desktop_dir / "Brahma Evo.lnk"
+        shortcut_path = desktop_dir / "Brahma Celestia.lnk"
         script_path = BASE_DIR / "main.py"
         icon_path = BASE_DIR / "assets" / "Brahma_Lite_Logo.ico"
 
@@ -200,7 +220,7 @@ def _ensure_desktop_shortcut() -> None:
             f"$Shortcut.Arguments = '{_ps_escape(shortcut_args)}'",
             f"$Shortcut.WorkingDirectory = '{_ps_escape(str(BASE_DIR))}'",
             "$Shortcut.WindowStyle = 1",
-            "$Shortcut.Description = 'Launch Brahma Evo'",
+            "$Shortcut.Description = 'Launch Celestia'",
             f"if ('{_ps_escape(icon_value)}') {{ $Shortcut.IconLocation = '{_ps_escape(icon_value)},0' }}",
             "$Shortcut.Save()",
         ])
@@ -223,7 +243,7 @@ def _load_system_prompt() -> str:
         base_prompt = PROMPT_PATH.read_text(encoding="utf-8")
     except Exception:
         base_prompt = (
-            "You are Brahma Evo, a calm, direct, and professional AI assistant. "
+            "You are Celestia, a calm, direct, and professional AI assistant. "
             "Be concise, direct, and always use the provided tools to complete tasks. "
             "Never simulate or guess results — always call the appropriate tool. "
             "If the user asks to create, build, launch, or open a website, always use the selected workspace folder."
@@ -231,7 +251,7 @@ def _load_system_prompt() -> str:
         
     try:
         from core.identity import identity
-        ast_name = identity.get_assistant_name() or "Brahma Evo"
+        ast_name = identity.get_assistant_name() or "Celestia"
         own_name = identity.get_owner_name() or "the user"
         role = identity.get_owner_role()
         mode = identity.get_behavior_mode()
@@ -257,6 +277,22 @@ def _load_system_prompt() -> str:
         except Exception as e_rules:
             print(f"[LearnedRules] Error injecting rules into prompt: {e_rules}")
 
+        # Inject live OS context so tool routing matches this machine.
+        try:
+            import platform as _platform
+
+            _os_name = _platform.system()
+            _os_nice = {"Windows": "Windows", "Darwin": "macOS", "Linux": "Linux"}.get(
+                _os_name, _os_name
+            )
+            identity_str += (
+                f"[RUNNING ON]\nYou are running natively on {_os_nice} "
+                f"({_platform.platform()}). Route every computer action to this OS's "
+                f"native mechanisms.\n\n"
+            )
+        except Exception:
+            pass
+
         return identity_str + base_prompt
     except Exception as e:
         print(f"Error injecting identity: {e}")
@@ -276,7 +312,7 @@ def _speak_daily_briefing(ui=None, speak=None) -> None:
         data, narrative = compile_unified_briefing()
         if ui:
             ui.show_daily_briefing(data)
-            ui.write_log(f"Brahma Evo: {narrative}")
+            ui.write_log(f"Celestia: {narrative}")
         (speak or speak_native)(narrative)
     except Exception as e:
         print(f"[DailyBriefing] Error: {e}")
@@ -311,11 +347,11 @@ def _gemini_text_reply(prompt: str) -> str:
         http_options={"api_version": "v1beta"},
     )
     system_prompt = (
-        "You are Brahma Evo, a concise, helpful desktop assistant. "
+        "You are Celestia, a concise, helpful desktop assistant. "
         "Reply naturally and briefly. Do not mention internal implementation details."
     )
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-3.8-flash",
         contents=f"{system_prompt}\n\nUser: {prompt}",
         config={"temperature": 0.6},
     )
@@ -324,7 +360,7 @@ def _gemini_text_reply(prompt: str) -> str:
 
 def _ig_gemini_reply(username: str, text: str) -> str:
     system_prompt = (
-        "You are Brahma Evo, an AI personal assistant acting on behalf of your user. "
+        "You are Celestia, an AI personal assistant acting on behalf of your user. "
         "You have taken over their Instagram chat with the user's permission. "
         "Reply naturally, briefly, and conversationally to the incoming message. "
         "Do not sound like a bot. Keep your replies under 2 sentences."
@@ -337,7 +373,7 @@ def _ig_gemini_reply(username: str, text: str) -> str:
             http_options={"api_version": "v1beta"},
         )
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.8-flash",
             contents=f"{system_prompt}\n\nUser: {prompt}",
             config={"temperature": 0.6},
         )
@@ -357,7 +393,7 @@ def _ig_gemini_reply(username: str, text: str) -> str:
 
 def _clipboard_gemini_reply(text: str) -> str:
     system_prompt = (
-        "You are Brahma Evo, a witty and helpful AI assistant. "
+        "You are Celestia, a witty and helpful AI assistant. "
         "The user just copied the following text to their clipboard. "
         "Make a very short, interesting, or helpful 1-sentence comment or question about it. "
         "Do not offer to 'help' or ask 'how can I help'. Just make a standalone witty observation or summary."
@@ -369,7 +405,7 @@ def _clipboard_gemini_reply(text: str) -> str:
             http_options={"api_version": "v1beta"},
         )
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.8-flash",
             contents=f"{system_prompt}\n\nClipboard Text: {prompt}",
             config={"temperature": 0.8},
         )
@@ -534,10 +570,10 @@ def _wakeword_detected(text: str) -> bool:
     if not words:
         return False
     phrases = (
-        "brahma evo",
-        "hey brahma evo",
-        "hi brahma evo",
-        "hello brahma evo",
+        "celestia",
+        "hey celestia",
+        "hi celestia",
+        "hello celestia",
         "hey",
         "hi",
         "hello",
@@ -545,7 +581,7 @@ def _wakeword_detected(text: str) -> bool:
     compact = " ".join(words)
     if compact in phrases or any(p in compact for p in phrases):
         return True
-    return any(word in {"brahma evo", "hey", "hi", "hello"} for word in words)
+    return any(word in {"celestia", "hey", "hi", "hello"} for word in words)
 
 
 def _build_task_plan(text: str) -> list[str]:
@@ -1042,6 +1078,7 @@ TOOL_DECLARATIONS = [
         "description": (
             "Controls the computer: volume, brightness, window management, keyboard shortcuts, "
             "typing text on screen, closing apps, fullscreen, dark mode, WiFi, restart, shutdown, "
+            "keep-awake, empty trash, permission check, "
             "scrolling, tab management, zoom, screenshots, lock screen, refresh/reload page. "
             "Use for ANY single computer control command. NEVER route to agent_task."
         ),
@@ -1421,7 +1458,7 @@ TOOL_DECLARATIONS = [
         "name": "presentation_builder",
         "description": (
             "Creates editable PowerPoint presentations (.pptx) from a structured slide outline. "
-            "Brahma Evo automatically infers the best visual style from the topic, searches for a matching online template when available, "
+            "Celestia automatically infers the best visual style from the topic, searches for a matching online template when available, "
             "reuses cached templates, and falls back to the built-in designer if no suitable template is found. "
             "Use when the user asks for a deck, slideshow, presentation, pitch deck, or report slides."
         ),
@@ -1432,7 +1469,7 @@ TOOL_DECLARATIONS = [
                 "subtitle": {"type": "STRING", "description": "Optional subtitle or audience line"},
                 "theme": {
                     "type": "STRING",
-                    "description": "Optional presentation theme or visual direction such as neon, corporate, luxury, academic, sunset, or creative. If omitted, Brahma Evo infers the best style automatically."
+                    "description": "Optional presentation theme or visual direction such as neon, corporate, luxury, academic, sunset, or creative. If omitted, Celestia infers the best style automatically."
                 },
                 "outline": {
                     "type": "STRING",
@@ -1592,7 +1629,7 @@ TOOL_DECLARATIONS = [
         "description": (
             "Shuts down the assistant completely. "
         "Call this when the user expresses intent to end the conversation, "
-        "close the assistant, say goodbye, or stop Brahma Evo. "
+        "close the assistant, say goodbye, or stop Celestia. "
         "The user can say this in ANY language."
     ),
     "parameters": {
@@ -2206,7 +2243,7 @@ class BrahmaLive:
         if skill_goal is not None:
             if not skill_goal:
                 prompt = "What should the new skill or feature do?"
-                self.ui.write_log(f"Brahma Evo: {prompt}")
+                self.ui.write_log(f"Celestia: {prompt}")
                 self.speak(prompt)
                 return
 
@@ -2243,7 +2280,7 @@ class BrahmaLive:
                             out_text = str(res.get("summary") or res.get("output") or res.get("text") or res).strip()
                         else:
                             out_text = str(res).strip()
-                        self.ui.write_log(f"Brahma Evo [{skill_name}]:\n{out_text}")
+                        self.ui.write_log(f"Celestia [{skill_name}]:\n{out_text}")
                         if hasattr(self.ui, "finish_task_workspace"):
                             self.ui.finish_task_workspace(out_text, f"{skill_name} completed.", 100)
                         if hasattr(self.ui, "show_hud_deliverable"):
@@ -2298,7 +2335,7 @@ class BrahmaLive:
             if not recipient:
                 self._email_step = 0
                 prompt = "Who would you like to send the email to?"
-                self.ui.write_log(f"Brahma Evo: {prompt}")
+                self.ui.write_log(f"Celestia: {prompt}")
                 self.speak(prompt)
                 try:
                     self.ui.update_task_workspace(
@@ -2311,7 +2348,7 @@ class BrahmaLive:
             else:
                 self._email_step = 1
                 prompt = "Which email app would you like to use? (Gmail, default mail app, etc.)"
-                self.ui.write_log(f"Brahma Evo: {prompt}")
+                self.ui.write_log(f"Celestia: {prompt}")
                 self.speak(prompt)
                 try:
                     self.ui.update_task_workspace(
@@ -2359,10 +2396,10 @@ class BrahmaLive:
             devices = self._smart_home.list_devices()
             routed_text_home = sd_mgr.route_command(text, devices)
             if routed_text_home != text:
-                print(f"[BRAHMA EVO] Redirection: '{text}' -> '{routed_text_home}'")
+                print(f"[CELESTIA] Redirection: '{text}' -> '{routed_text_home}'")
                 text = routed_text_home
         except Exception as e:
-            print(f"[BRAHMA EVO] Redirection error: {e}")
+            print(f"[CELESTIA] Redirection error: {e}")
 
         developer_settings = self.ui._load_app_settings() if hasattr(self.ui, "_load_app_settings") else {}
         developer_workspace = str(developer_settings.get("developer_mode_workspace", "")).strip()
@@ -2742,7 +2779,7 @@ class BrahmaLive:
             try:
                 self.ui.update_task_workspace(
                     status="Scanning screen",
-                    output="Brahma Evo is inspecting the screen for what you asked about.",
+                    output="Celestia is inspecting the screen for what you asked about.",
                     percent=40,
                 )
             except Exception:
@@ -2848,7 +2885,7 @@ class BrahmaLive:
                 percent=100,
                 source=source,
             )
-            self.ui.write_log(f"Brahma Evo: {detail}")
+            self.ui.write_log(f"Celestia: {detail}")
             self.speak(detail)
             if not self.ui.muted:
                 self.ui.set_state("LISTENING")
@@ -3036,7 +3073,7 @@ class BrahmaLive:
                     percent=100,
                     source=source,
                 )
-                self.ui.write_log(f"Brahma Evo: {detail}")
+                self.ui.write_log(f"Celestia: {detail}")
                 self.speak(detail)
                 if not self.ui.muted:
                     self.ui.set_state("LISTENING")
@@ -3108,7 +3145,7 @@ class BrahmaLive:
 
     def _announce_attention(self, event: dict):
         msg = self._attention_message(event)
-        self.ui.write_log(f"Brahma Evo: {msg}")
+        self.ui.write_log(f"Celestia: {msg}")
         if self.session and self._loop:
             self.speak(msg)
         else:
@@ -3181,7 +3218,7 @@ class BrahmaLive:
         if summary:
             self.ui.write_log(f"[Meeting] {summary}")
         if answer:
-            self.ui.write_log(f"Brahma Evo: {answer}")
+            self.ui.write_log(f"Celestia: {answer}")
 
     def _on_meeting_state(self, state: str):
         if state == "LISTENING":
@@ -3202,7 +3239,7 @@ class BrahmaLive:
             self._reply_mode = True
 
         message = "What would you like to say in reply?"
-        self.ui.write_log(f"Brahma Evo: {message}")
+        self.ui.write_log(f"Celestia: {message}")
         if self.session and self._loop:
             self.speak(message)
         else:
@@ -3329,7 +3366,7 @@ class BrahmaLive:
         try:
             client = genai.Client(api_key=_get_api_key(), http_options={"api_version": "v1beta"})
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-3.8-flash",
                 contents=f"{system_prompt}\n\nUser Response: {text}",
                 config={"temperature": 0.1, "response_mime_type": "application/json"}
             )
@@ -3363,7 +3400,7 @@ class BrahmaLive:
             if intent == "CANCEL":
                 self._ig_reply_mode = False
                 msg = "Instagram reply cancelled."
-                self.ui.write_log(f"Brahma Evo: {msg}")
+                self.ui.write_log(f"Celestia: {msg}")
                 self.speak(msg)
                 self._ig_pending_thread = None
                 return True
@@ -3407,7 +3444,7 @@ class BrahmaLive:
             self._email_step = 0
             self._email_profiles = {}
             msg = "Email sending cancelled, sir."
-            self.ui.write_log(f"Brahma Evo: {msg}")
+            self.ui.write_log(f"Celestia: {msg}")
             self.speak(msg)
             try:
                 self.ui.finish_task_workspace("Email sending cancelled.", "Cancelled", 100)
@@ -3420,7 +3457,7 @@ class BrahmaLive:
             self._email_recipient = text.strip()
             self._email_step = 1
             prompt = "Which email app would you like to use? (Gmail, default mail app, etc.)"
-            self.ui.write_log(f"Brahma Evo: {prompt}")
+            self.ui.write_log(f"Celestia: {prompt}")
             self.speak(prompt)
             try:
                 self.ui.update_task_workspace(
@@ -3438,7 +3475,7 @@ class BrahmaLive:
             self._email_step = 2
             
             prompt = "What is the message you'd like to send?"
-            self.ui.write_log(f"Brahma Evo: {prompt}")
+            self.ui.write_log(f"Celestia: {prompt}")
             self.speak(prompt)
             try:
                 self.ui.update_task_workspace(
@@ -3458,7 +3495,7 @@ class BrahmaLive:
             
             # Now let's execute composing!
             msg = f"Opening {self._email_app} and composing email to {self._email_recipient}..."
-            self.ui.write_log(f"Brahma Evo: {msg}")
+            self.ui.write_log(f"Celestia: {msg}")
             self.speak(msg)
             try:
                 self.ui.update_task_workspace(
@@ -3472,7 +3509,7 @@ class BrahmaLive:
             try:
                 import urllib.parse
                 import webbrowser
-                subject = "Message from Brahma Evo"
+                subject = "Message from Celestia"
                 quoted_recipient = urllib.parse.quote(self._email_recipient)
                 quoted_subject = urllib.parse.quote(subject)
                 quoted_body = urllib.parse.quote(self._email_message)
@@ -3487,7 +3524,7 @@ class BrahmaLive:
                 if "gmail" in app_lower or "chrome" in app_lower:
                     import urllib.parse
                     quoted_recipient = urllib.parse.quote(self._email_recipient)
-                    quoted_subject = urllib.parse.quote("Message from Brahma Evo")
+                    quoted_subject = urllib.parse.quote("Message from Celestia")
                     quoted_body = urllib.parse.quote(self._email_message)
                     url = f"https://mail.google.com/mail/?view=cm&fs=1&to={quoted_recipient}&su={quoted_subject}&body={quoted_body}"
                     
@@ -3532,7 +3569,7 @@ class BrahmaLive:
                 return self._prompt_message_reply(event)
             if self._attention_matches(lower, ("hear", "read", "what is it", "tell me", "show it", "open it")):
                 preview = read_event_preview(event)
-                self.ui.write_log(f"Brahma Evo: {preview}")
+                self.ui.write_log(f"Celestia: {preview}")
                 threading.Thread(target=speak_native, args=(preview,), daemon=True).start()
                 with self._attention_lock:
                     self._pending_attention = None
@@ -3582,7 +3619,7 @@ class BrahmaLive:
         if kind == "message":
             if decision == "hear":
                 preview = read_event_preview(event)
-                self.ui.write_log(f"Brahma Evo: {preview}")
+                self.ui.write_log(f"Celestia: {preview}")
                 threading.Thread(target=speak_native, args=(preview,), daemon=True).start()
             elif decision == "reply":
                 self._prompt_message_reply(event)
@@ -3614,7 +3651,7 @@ class BrahmaLive:
             try:
                 self.ui.update_task_workspace(
                     status="Thinking",
-                    output="Brahma Evo is drafting a direct reply.",
+                    output="Celestia is drafting a direct reply.",
                     percent=35,
                 )
             except Exception:
@@ -3627,7 +3664,7 @@ class BrahmaLive:
                 try:
                     reply = _gemini_text_reply(request_text)
                 except Exception as e:
-                    print(f"[BRAHMA EVO] ⚠️ Gemini fallback failed: {e}")
+                    print(f"[CELESTIA] ⚠️ Gemini fallback failed: {e}")
                     if _is_gemini_limit_error(e):
                         self._use_openrouter_first = True
 
@@ -3636,18 +3673,18 @@ class BrahmaLive:
                     reply = openrouter_client.chat(
                         request_text,
                         system=(
-                            "You are Brahma Evo, a concise, helpful desktop assistant. "
+                            "You are Celestia, a concise, helpful desktop assistant. "
                             "Reply naturally and briefly. Do not mention internal implementation details."
                         ),
                     )
                 except Exception as e:
-                    print(f"[BRAHMA EVO] ⚠️ OpenRouter fallback failed: {e}")
+                    print(f"[CELESTIA] ⚠️ OpenRouter fallback failed: {e}")
                     if gemini_first and not self._use_openrouter_first and _is_gemini_limit_error(e):
                         self._use_openrouter_first = True
             reply = (reply or "").strip()
             if not reply:
                 reply = "I’m ready, sir."
-            self.ui.write_log(f"Brahma Evo: {reply}")
+            self.ui.write_log(f"Celestia: {reply}")
             try:
                 self.ui.finish_task_workspace(reply, "Reply delivered.", 100)
             except Exception:
@@ -3656,7 +3693,7 @@ class BrahmaLive:
                 self.ui.set_state("LISTENING")
         except Exception as e:
             msg = f"Fallback reply failed: {e}"
-            print(f"[BRAHMA EVO] ⚠️ {msg}")
+            print(f"[CELESTIA] ⚠️ {msg}")
             self.ui.write_log(f"ERR: {msg}")
             try:
                 self.ui.finish_task_workspace(msg, "Reply failed.", 100)
@@ -3718,7 +3755,7 @@ class BrahmaLive:
                     prompt = f"System Alert / Context: {text}\n\nPlease relay this information to me naturally now."
                     await self.session.send(input=prompt, end_of_turn=True)
                 except Exception as e:
-                    print(f"[BRAHMA EVO] Unified Speak err: {e}")
+                    print(f"[CELESTIA] Unified Speak err: {e}")
             asyncio.run_coroutine_threadsafe(_send(), self._loop)
         else:
             # Fallback to Edge TTS if Gemini Live is disconnected
@@ -3776,7 +3813,7 @@ class BrahmaLive:
             except Exception:
                 pass
             try:
-                self.ui.write_log(f"Brahma Evo: {announcement}")
+                self.ui.write_log(f"Celestia: {announcement}")
                 if execution_output:
                     self.ui.write_log(f"Result:\n{execution_output}")
             except Exception:
@@ -3837,7 +3874,7 @@ class BrahmaLive:
             parts.append(mem_str)
         parts.append(sys_prompt)
         parts.append(
-            "Wake-word mode: if the microphone is muted, still listen for the words 'Brahma Evo', 'hey', 'hi', and 'hello'. "
+            "Wake-word mode: if the microphone is muted, still listen for the words 'Celestia', 'hey', 'hi', and 'hello'. "
             "When you hear one of these activation cues, keep the session friendly and concise, "
             "and wait for the user's next command. "
             "IMPORTANT: Do NOT speak an unprompted generic greeting (like 'Thank you, how can I help you?') upon connecting. "
@@ -3875,7 +3912,7 @@ class BrahmaLive:
         name = fc.name
         args = dict(fc.args or {})
 
-        print(f"[BRAHMA EVO] 🔧 {name}  {args}")
+        print(f"[CELESTIA] 🔧 {name}  {args}")
         self.speak(f"Working on {name.replace('_', ' ')}...")
         self.ui.set_state("THINKING")
 
@@ -4104,7 +4141,7 @@ class BrahmaLive:
                     if recipient:
                         if action == "take_over":
                             add_auto_thread(thread_id or recipient)
-                            result = f"Successfully took over the chat with @{recipient}. Brahma Evo will now automatically reply."
+                            result = f"Successfully took over the chat with @{recipient}. Celestia will now automatically reply."
                         else:
                             res = InstagramService.instance().send_dm(recipient, reply_text, open_in_browser=True)
                             result = f"Sent reply to @{recipient}: '{reply_text}'. Thread opened in browser."
@@ -4327,7 +4364,7 @@ class BrahmaLive:
                     from core.confirm import request
                     result = request(
                         "start-call-screening",
-                        "Answer this call as Brahma Evo",
+                        "Answer this call as Celestia",
                         f"Brahma will answer {event['title']} in {event['app']}, listen to the caller, and prepare a transcript and summary.",
                         lambda: (start_call_proxy(event, ui=self.ui, speak_fn=self.speak) and "Call screening started.")
                     )
@@ -4376,7 +4413,7 @@ class BrahmaLive:
                             out_text = str(run_res.get("summary") or run_res.get("output") or run_res.get("text") or run_res).strip()
                         else:
                             out_text = str(run_res).strip()
-                        self.ui.write_log(f"Brahma Evo [{skill_name}]:\n{out_text}")
+                        self.ui.write_log(f"Celestia [{skill_name}]:\n{out_text}")
                         result = out_text
                 else:
                     result = "Choose list or run."
@@ -4391,7 +4428,7 @@ class BrahmaLive:
                         out_text = str(run_res.get("summary") or run_res.get("output") or run_res.get("text") or run_res).strip()
                     else:
                         out_text = str(run_res).strip()
-                    self.ui.write_log(f"Brahma Evo [{name}]:\n{out_text}")
+                    self.ui.write_log(f"Celestia [{name}]:\n{out_text}")
                     result = out_text
                 else:
                     result = f"Unknown tool: {name}"
@@ -4532,7 +4569,7 @@ class BrahmaLive:
         tool_voice = self._connect_tool_voice(name, result)
         if tool_voice:
             try:
-                self.ui.write_log(f"Brahma Evo: {tool_voice}")
+                self.ui.write_log(f"Celestia: {tool_voice}")
             except Exception:
                 pass
             try:
@@ -4543,7 +4580,7 @@ class BrahmaLive:
         if not self.ui.muted:
             self.ui.set_state("LISTENING")
 
-        print(f"[BRAHMA EVO] 📤 {name} → {str(result)[:80]}")
+        print(f"[CELESTIA] 📤 {name} → {str(result)[:80]}")
 
         return types.FunctionResponse(
             id=fc.id, name=name,
@@ -4594,7 +4631,7 @@ class BrahmaLive:
             await self.session.send_realtime_input(media=msg)
 
     async def _listen_audio(self):
-        print("[BRAHMA EVO] 🎤 Mic started")
+        print("[CELESTIA] 🎤 Mic started")
         loop = asyncio.get_event_loop()
         import numpy as np
 
@@ -4662,15 +4699,15 @@ class BrahmaLive:
                 device=_mic_dev,
                 callback=callback,
             ):
-                print(f"[BRAHMA EVO] 🎤 Mic stream open ({_mic_name or 'Default'})")
+                print(f"[CELESTIA] 🎤 Mic stream open ({_mic_name or 'Default'})")
                 while True:
                     await asyncio.sleep(0.1)
         except Exception as e:
-            print(f"[BRAHMA EVO] ❌ Mic: {e}")
+            print(f"[CELESTIA] ❌ Mic: {e}")
             raise
 
     async def _receive_audio(self):
-        print("[BRAHMA EVO] 👂 Recv started")
+        print("[CELESTIA] 👂 Recv started")
         out_buf, in_buf = [], []
 
         try:
@@ -4720,7 +4757,7 @@ class BrahmaLive:
 
                             full_out = " ".join(out_buf).strip()
                             if full_out:
-                                self.ui.write_log(f"Brahma Evo: {full_out}")
+                                self.ui.write_log(f"Celestia: {full_out}")
                             out_buf = []
 
                             if full_in and len(full_in) > 5:
@@ -4734,7 +4771,7 @@ class BrahmaLive:
                         self.ui.set_state("EXECUTING")
                         fn_responses = []
                         for fc in response.tool_call.function_calls:
-                            print(f"[BRAHMA EVO] 📞 {fc.name}")
+                            print(f"[CELESTIA] 📞 {fc.name}")
                             fr = await self._execute_tool(fc)
                             fn_responses.append(fr)
                         self.ui.set_state("THINKING")
@@ -4743,12 +4780,12 @@ class BrahmaLive:
                         )
 
         except Exception as e:
-            print(f"[BRAHMA EVO] ❌ Recv: {e}")
+            print(f"[CELESTIA] ❌ Recv: {e}")
             traceback.print_exc()
             raise
 
     async def _play_audio(self):
-        print("[BRAHMA EVO] 🔊 Play started")
+        print("[CELESTIA] 🔊 Play started")
         loop = asyncio.get_event_loop()
         import numpy as np
 
@@ -4775,7 +4812,7 @@ class BrahmaLive:
                     pass
                 await asyncio.to_thread(stream.write, chunk)
         except Exception as e:
-            print(f"[BRAHMA EVO] ❌ Play: {e}")
+            print(f"[CELESTIA] ❌ Play: {e}")
             raise
         finally:
             self.set_speaking(False)
@@ -4824,7 +4861,7 @@ class BrahmaLive:
 
         while True:
             try:
-                print("[BRAHMA EVO] 🔌 Connecting...")
+                print("[CELESTIA] 🔌 Connecting...")
                 self.ui.set_state("THINKING")
                 config = self._build_config()
 
@@ -4837,14 +4874,14 @@ class BrahmaLive:
                         self.audio_in_queue = asyncio.Queue()
                         self.out_queue      = asyncio.Queue()  # Fix: removed maxsize=10 to prevent dropping packets
                         
-                        print("[BRAHMA EVO] ✅ Connected.")
+                        print("[CELESTIA] ✅ Connected.")
                         try:
                             self.ui.boot_set_step_status("Connect AI backend", "done")
                             self.ui.boot_set_progress(75, "AI backend connected")
                         except Exception:
                             pass
                         self.ui.set_state("LISTENING")
-                        self.ui.write_log("SYS: Brahma Evo online.")
+                        self.ui.write_log("SYS: Celestia online.")
 
                         tg.create_task(self._send_realtime())
                         tg.create_task(self._listen_audio())
@@ -4877,7 +4914,7 @@ class BrahmaLive:
                         pass
                     
             except Exception as e:
-                print(f"[BRAHMA EVO] ⚠️ {e}")
+                print(f"[CELESTIA] ⚠️ {e}")
                 traceback.print_exc()
                 if _is_gemini_limit_error(e):
                     self._use_openrouter_first = True
@@ -4885,7 +4922,7 @@ class BrahmaLive:
                 self._loop = None
             self.set_speaking(False)
             self.ui.set_state("LISTENING")
-            print("[BRAHMA EVO] 🔄 Reconnecting in 5s...")
+            print("[CELESTIA] 🔄 Reconnecting in 5s...")
             await asyncio.sleep(5)
 
 def main():
@@ -4904,7 +4941,7 @@ def main():
     if DashboardServer is not None and not dashboard_enabled:
         _startup_log("dashboard disabled: port 8000 already in use")
         try:
-            ui.write_log("SYS: Mobile Connect is already running in another Brahma Evo instance.")
+            ui.write_log("SYS: Mobile Connect is already running in another Celestia instance.")
         except Exception:
             pass
     if dashboard_enabled:
@@ -5058,7 +5095,7 @@ def main():
                     snippet = f": '{clean_text[:75]}...'" if len(clean_text) > 75 else (f": '{clean_text}'" if clean_text else "")
                     msg = f"You received a new Instagram message from {username}{snippet}. What should I reply, or should I take over the chat?"
                     ui.write_log(f"📱 Insta (@{username}): {clean_text or '[Media/Attachment]'}")
-                    ui.write_log(f"Brahma Evo: {msg}")
+                    ui.write_log(f"Celestia: {msg}")
                     brahma_evo.speak(msg)
                     return None
                 
@@ -5079,14 +5116,14 @@ def main():
                     subj_preview = f"'{clean_subj[:70]}...'" if len(clean_subj) > 70 else f"'{clean_subj}'"
                     msg = f"You received a new email from {sender} with subject: {subj_preview}."
                     ui.write_log(f"📧 Email ({sender}): {clean_subj}")
-                    ui.write_log(f"Brahma Evo: {msg}")
+                    ui.write_log(f"Celestia: {msg}")
                     brahma_evo.speak(msg)
 
                 set_email_prompt_callback(_email_handler)
                 start_email_daemon(poll_interval=25)
-                print("[Brahma Evo] Background email watcher started.")
+                print("[Celestia] Background email watcher started.")
         except Exception as e:
-            print(f"[Brahma Evo] Email daemon initialization notice: {e}")
+            print(f"[Celestia] Email daemon initialization notice: {e}")
 
         def _clipboard_monitor():
             try:
@@ -5103,7 +5140,7 @@ def main():
                         text = (curr_clip or "").strip()
                         if text and len(text) > 3:
                             reply = _clipboard_gemini_reply(text[:1000])
-                            ui.write_log(f"Brahma Evo (Clipboard): {reply}")
+                            ui.write_log(f"Celestia (Clipboard): {reply}")
                             brahma_evo.speak(reply)
                 except Exception:
                     pass

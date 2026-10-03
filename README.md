@@ -1,8 +1,8 @@
-# ⚡ Brahma AI Evo — Autonomous Desktop Operating Intelligence
+# ⚡ Celestia — Autonomous Desktop Operating Intelligence
 
 <div align="center">
 
-<img src="assets/brahma_evo_logo.png" alt="Brahma AI Evo Logo" width="220" />
+<img src="assets/brahma_evo_logo.png" alt="Celestia Logo" width="220" />
 
 ### *The Self-Evolving, Multimodal Personal AI Desktop Environment*
 
@@ -18,22 +18,22 @@
 
 ## 🌌 Overview
 
-**Brahma AI Evo** is a next-generation desktop intelligence built to function like an authentic JARVIS workstation. Combining real-time bi-directional native voice audio, multimodal computer vision, autonomous code self-evolution, and local system orchestrations, Brahma Evo transforms your Windows PC into a self-evolving command center.
+**Celestia** is a next-generation desktop intelligence built to function like an authentic JARVIS workstation. Combining real-time bi-directional native voice audio, multimodal computer vision, autonomous code self-evolution, and local system orchestrations, Celestia transforms your computer into a self-evolving command center.
 
 ---
 
-## ⚡ What's New in Brahma AI Evo
+## ⚡ What's New in Celestia
 
 ### 1. 🔌 Holographic Hardware Assembler & Circuit HUD
-- **Screen & Voice Part Recognition**: Brahma scans your screen via computer vision or parses voice commands (`"Brahma, how to connect DHT11 to Arduino Pro Mini"`) to recognize microcontrollers (Arduino Uno, Pro Mini, ESP32), sensors (DHT11, HC-SR04 ultrasonic, servos), and passive components.
-- **In-App Interactive Pop-up**: Opens a compact, dark glassmorphic popup overlay directly inside Brahma showing:
+- **Screen & Voice Part Recognition**: Celestia scans your screen via computer vision or parses voice commands (`"Celestia, how to connect DHT11 to Arduino Pro Mini"`) to recognize microcontrollers (Arduino Uno, Pro Mini, ESP32), sensors (DHT11, HC-SR04 ultrasonic, servos), and passive components.
+- **In-App Interactive Pop-up**: Opens a compact, dark glassmorphic popup overlay directly inside Celestia showing:
   - Component cards with pinout labels (`VCC`, `DATA`, `GND`, `2`, `p8`, `p9`).
   - **Animated glowing neon SVG wires** with real-time flowing white electron pulse dots.
   - Numbered pin bubbles (`①`, `②`, `③`, `④`, `⑤`).
   - Operating voltage safety callouts and ready-to-flash Arduino C++ firmware.
 
 ### 2. 🧬 Project Ultron — Self-Evolving Autonomous Skill Crucible
-- **On-the-Fly Code Synthesis**: When asked to execute a task outside its built-in toolkit, Brahma identifies the capability gap, writes a brand-new Python tool directly into `features/`, tests it inside an isolated sandbox ("The Crucible"), and auto-registers it dynamically without restarting the application.
+- **On-the-Fly Code Synthesis**: When asked to execute a task outside its built-in toolkit, Celestia identifies the capability gap, writes a brand-new Python tool directly into `features/`, tests it inside an isolated sandbox ("The Crucible"), and auto-registers it dynamically without restarting the application.
 - **Persistent Vault**: All forged skills are saved in your `features/` directory and hot-reloaded automatically.
 
 ### 3. 🛡️ Proactive Auto-Heal Engine
@@ -44,7 +44,7 @@
 - **Dynamic State Glow States**:
   - 🟡 **Gold**: Standby / Listening
   - 🔵 **Cyan / Blue**: Capturing Voice (Live Energy Wave)
-  - 🟣 **Purple**: Brahma Reasoning / Thinking
+  - 🟣 **Purple**: Celestia Reasoning / Thinking
   - 🟢 **Green**: Executing Tool / System Action
   - 🔴 **Red**: Muted
 
@@ -88,7 +88,7 @@
 - **PDF Suite**: Convert, merge, extract, and assemble PDF deliverables.
 
 ### 📱 Brahma Connect (Android Companion)
-- **AI Phone Call Proxy**: Brahma screens incoming phone calls, talks to the caller, takes meeting notes, and delivers immediate desktop transcripts and summaries.
+- **AI Phone Call Proxy**: Celestia screens incoming phone calls, talks to the caller, takes meeting notes, and delivers immediate desktop transcripts and summaries.
 - **Ecosystem Sync**: Device geolocation, SMS notifications, and battery status.
 
 ### 🏡 Smart Home Hub
@@ -102,18 +102,18 @@
 ## 🚀 Quick Start
 
 ### Prerequisites
-- **Windows 10 / 11** (64-bit)
-- **Python 3.11** or **Python 3.12**
+- **Windows 10 / 11** (64-bit) **or macOS 13+** (Apple Silicon / Intel) **or Linux**
+- **Python 3.10+** (3.12 recommended)
 - **Git**
 - Working Microphone & Speakers (Webcam optional for vision)
 - **Google Gemini API Key** (Get from [Google AI Studio](https://aistudio.google.com/))
 
-### Installation
+### Installation — Windows
 
 1. **Clone the repository:**
    ```powershell
-   git clone https://github.com/titechprabhasolutions/Brahma-Ai-Evo.git
-   cd Brahma-Ai-Evo
+   git clone https://github.com/Godbridger9893/ch83btkhr-.git
+   cd ch83btkhr-
    ```
 
 2. **Run the Automated Setup:**
@@ -125,8 +125,44 @@
    start_brahma.bat
    ```
 
-3. **Configure API Keys:**
-   - Launch Brahma AI Evo.
+### Installation — macOS (production-ready)
+
+1. **Install system prerequisites** (Homebrew + Python + audio):
+   ```zsh
+   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+   brew install python@3.12 portaudio git
+   ```
+
+2. **Clone and set up** (one command does pip deps, browsers, and config):
+   ```zsh
+   git clone https://github.com/Godbridger9893/ch83btkhr-.git
+   cd ch83btkhr-
+   python3 setup.py
+   ```
+   Optional but recommended — isolated environment:
+   ```zsh
+   python3 -m venv .venv && source .venv/bin/activate
+   python setup.py
+   ```
+
+3. **Launch:**
+   ```zsh
+   ./start_brahma.sh
+   ```
+
+4. **Grant macOS permissions** (required for full control) — or just say
+   *"check permissions"* once Brahma is running:
+   - **Accessibility** → your terminal app (Terminal / iTerm / IDE) — keystrokes, window control, Push-to-Talk
+   - **Screen Recording** → same app — screenshots, screen reading, click automation
+   - **Microphone** → prompted automatically on first use
+   - System Settings → Privacy & Security → toggle on, then restart Celestia.
+
+5. **Optional Mac extras:**
+   - Display-brightness API: `brew install brightness`
+   - Global media keys work out of the box via Spotify / Music.app.
+
+### Configure API Keys (all platforms)
+   - Launch Celestia.
    - Click the **Settings** icon on the top navigation bar.
    - Enter your **Gemini API Key** and any optional credentials (Spotify MCP, Weather, etc.) into the respective cards.
    - Click **Save & Connect**.
@@ -137,9 +173,9 @@
 
 | Intent | Sample Voice / Text Command |
 | :--- | :--- |
-| **Hardware Circuit** | *"Brahma, how to connect DHT11 to Arduino Pro Mini"* |
+| **Hardware Circuit** | *"Celestia, how to connect DHT11 to Arduino Pro Mini"* |
 | **Circuit Vision** | *"See the Arduino parts on my screen and tell me how to assemble them"* |
-| **Self-Evolution** | *"Brahma, learn a new skill to track International Space Station coordinates"* |
+| **Self-Evolution** | *"Celestia, learn a new skill to track International Space Station coordinates"* |
 | **Flight Radar** | *"Show flight route from Mumbai to London"* |
 | **Nearby Amenities** | *"Find nearby hospitals on the map"* |
 | **Music Playback** | *"Play Starboy on Spotify"* |
@@ -152,7 +188,7 @@
 ## 🏗️ Architecture
 
 ```
-Brahma AI Evo/
+Celestia/
 ├── main.py                     # Main application entry point & live event loop
 ├── ui.py                       # PyQt6 GUI: Command Bar, Waveform FFT, HUD Wings, Chat
 ├── actions/                    # Built-in action tools & executors
@@ -190,7 +226,7 @@ Brahma AI Evo/
 
 **Personal & Private Local Use Only — No Distribution.**
 
-This project is licensed under the **Brahma AI Evo Source-Available Personal Use License**.
+This project is licensed under the **Celestia Source-Available Personal Use License**.
 
 - ✅ **Allowed:** You may download, clone, inspect, build, and run the software locally strictly on your own personal device for private, personal, educational, and research use.
 - 🚫 **Strictly Prohibited (No Distribution):** You may **NOT** distribute, redistribute, re-upload, mirror, share, transmit, sublicense, or publish this software, repository, binaries, or derivative works anywhere (including other Git hosts, public repositories, or cloud platforms). The only official distribution source is this repository.
@@ -199,5 +235,5 @@ This project is licensed under the **Brahma AI Evo Source-Available Personal Use
 For full terms and legal conditions, see the [LICENSE](LICENSE) file. For commercial licensing inquiries, reach out via [Discord](https://discord.gg/gEYmJKKtq3).
 
 <div align="center">
-<b>Brahma AI Evo</b> • Built with intelligence, precision, and autonomy.
+<b>Celestia</b> • Built with intelligence, precision, and autonomy.
 </div>

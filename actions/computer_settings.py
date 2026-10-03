@@ -1,6 +1,7 @@
 #computer_settings.py
 import json
 import re
+import shutil
 import sys
 import time
 import subprocess
@@ -132,6 +133,18 @@ def brightness_get() -> int | None:
                 capture_output=True, text=True, timeout=5, **_WIN_HIDE
             )
             return max(0, min(100, int(r.stdout.strip())))
+        if _OS == "Darwin":
+            # Homebrew `brightness` tool: `brightness -l` prints
+            # "display 0: brightness 0.750000". Absent tool -> None (no guess).
+            import shutil
+            if shutil.which("brightness") is None:
+                return None
+            r = subprocess.run(["brightness", "-l"],
+                               capture_output=True, text=True, timeout=5)
+            m = re.search(r"brightness\s+([0-9.]+)", r.stdout)
+            if m:
+                return max(0, min(100, round(float(m.group(1)) * 100)))
+            return None
         if _OS == "Linux" and subprocess.run(
                 ["which", "brightnessctl"], capture_output=True).returncode == 0:
             cur = int(subprocess.run(["brightnessctl", "get"],
@@ -155,6 +168,16 @@ def brightness_set(value: int) -> None:
              f".WmiSetBrightness(1, {value})"],
             capture_output=True, timeout=5, **_WIN_HIDE
         )
+    elif _OS == "Darwin":
+        import shutil
+        tool = shutil.which("brightness")
+        if tool is None:
+            raise RuntimeError(
+                "macOS brightness needs the free `brightness` tool — "
+                "install it once with: brew install brightness"
+            )
+        subprocess.run([tool, f"{value / 100:.3f}"],
+                       capture_output=True, timeout=5, check=True)
     elif _OS == "Linux":
         subprocess.run(["brightnessctl", "set", f"{value}%"], capture_output=True)
 
@@ -188,6 +211,13 @@ def volume_set(value: int):
 
 def brightness_up():
     if _OS == "Darwin":
+        cur = brightness_get()
+        if cur is not None:
+            try:
+                brightness_set(min(100, cur + 10))
+                return
+            except Exception as e:
+                print(f"[Settings] brightness_set failed: {e}")
         subprocess.run(["osascript", "-e",
             'tell application "System Events" to key code 144'],
             capture_output=True)
@@ -217,6 +247,13 @@ def brightness_up():
 
 def brightness_down():
     if _OS == "Darwin":
+        cur = brightness_get()
+        if cur is not None:
+            try:
+                brightness_set(max(0, cur - 10))
+                return
+            except Exception as e:
+                print(f"[Settings] brightness_set failed: {e}")
         subprocess.run(["osascript", "-e",
             'tell application "System Events" to key code 145'],
             capture_output=True)
@@ -511,6 +548,149 @@ def open_run():
     if _OS == "Windows":
         pyautogui.hotkey("win", "r")
 
+
+_CAFFEINATE_PROC = None
+
+
+def keep_awake() -> str:
+    """Prevents display+system sleep until allow_sleep(). macOS caffeinate,
+    Linux systemd-inhibit, Windows powercfg timeout stretch (restorable)."""
+    global _CAFFEINATE_PROC
+    if _OS == "Darwin":
+        if _CAFFEINATE_PROC is not None and _CAFFEINATE_PROC.poll() is None:
+            return "This Mac is already set to stay awake."
+        _CAFFEINATE_PROC = subprocess.Popen(
+            ["caffeinate", "-dims"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        return "This Mac will stay awake until you say allow sleep."
+    if _OS == "Linux":
+        if _CAFFEINATE_PROC is not None and _CAFFEINATE_PROC.poll() is None:
+            return "Already keeping the system awake."
+        try:
+            _CAFFEINATE_PROC = subprocess.Popen(
+                ["systemd-inhibit", "--what=sleep:idle", "--why=Brahma keep awake",
+                 "sleep", "infinity"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
+            return "System will stay awake until you say allow sleep."
+        except FileNotFoundError:
+            return "systemd-inhibit is not available on this Linux."
+    # Windows: stretch AC/DC sleep timeouts; undo restores them.
+    try:
+        subprocess.run(["powercfg", "/change", "standby-timeout-ac", "0"],
+                       capture_output=True, timeout=10, **_WIN_HIDE)
+        subprocess.run(["powercfg", "/change", "standby-timeout-dc", "0"],
+                       capture_output=True, timeout=10, **_WIN_HIDE)
+        return "PC will stay awake until you say allow sleep."
+    except Exception as e:
+        return f"Could not keep awake: {e}"
+
+
+def allow_sleep() -> str:
+    """Releases a keep_awake() hold."""
+    global _CAFFEINATE_PROC
+    if _CAFFEINATE_PROC is not None:
+        try:
+            _CAFFEINATE_PROC.terminate()
+        except Exception:
+            pass
+        _CAFFEINATE_PROC = None
+        return "Sleep allowed again."
+    if _OS == "Windows":
+        try:
+            subprocess.run(["powercfg", "/change", "standby-timeout-ac", "30"],
+                           capture_output=True, timeout=10, **_WIN_HIDE)
+            subprocess.run(["powercfg", "/change", "standby-timeout-dc", "15"],
+                           capture_output=True, timeout=10, **_WIN_HIDE)
+            return "Sleep allowed again."
+        except Exception as e:
+            return f"Could not restore sleep: {e}"
+    return "Nothing was keeping the system awake."
+
+
+def empty_trash() -> str:
+    if _OS == "Darwin":
+        subprocess.run(["osascript", "-e", 'tell application "Finder" to empty trash'],
+                       capture_output=True)
+        return "Trash emptied."
+    if _OS == "Windows":
+        try:
+            import ctypes
+            SHEmptyRecycleBin = ctypes.windll.shell32.SHEmptyRecycleBinW
+            SHEmptyRecycleBin(None, None, 7)  # no confirm, no progress, no sound
+            return "Recycle Bin emptied."
+        except Exception as e:
+            return f"Could not empty Recycle Bin: {e}"
+    # Linux: trash-cli if present, else clear common Trash dirs.
+    try:
+        import shutil
+        if shutil.which("trash-empty"):
+            subprocess.run(["trash-empty"], capture_output=True, timeout=30)
+            return "Trash emptied."
+    except Exception:
+        pass
+    cleared = 0
+    for base in (Path.home() / ".local" / "share" / "Trash",
+                 Path.home() / ".Trash"):
+        for sub in ("files", "info"):
+            d = base / sub
+            if d.is_dir():
+                for child in d.iterdir():
+                    try:
+                        if child.is_dir() and not child.is_symlink():
+                            shutil.rmtree(child, ignore_errors=True)
+                        else:
+                            child.unlink(missing_ok=True)
+                        cleared += 1
+                    except Exception:
+                        pass
+    return f"Trash emptied ({cleared} item(s))." if cleared else "Trash is already empty."
+
+
+def check_permissions() -> str:
+    """Reports the macOS privacy permissions Brahma needs, with fix paths."""
+    if _OS != "Darwin":
+        return ("Permission health-check is macOS-only. On Windows/Linux Brahma "
+                "uses standard desktop APIs with no extra grants.")
+    lines = []
+    ok_screen, ok_ax, ok_cam, ok_mic = None, None, None, None
+    try:
+        import Quartz
+        ok_screen = bool(Quartz.CGPreflightScreenCaptureAccess())
+    except Exception:
+        pass
+    try:
+        import ApplicationServices
+        ok_ax = bool(ApplicationServices.AXIsProcessTrusted())
+    except Exception:
+        pass
+    try:
+        import AVFoundation
+        # 3 == AVAuthorizationStatusAuthorized. Non-intrusive: never prompts.
+        ok_cam = AVFoundation.AVCaptureDevice.authorizationStatusForMediaType_(
+            AVFoundation.AVMediaTypeVideo) == 3
+        ok_mic = AVFoundation.AVCaptureDevice.authorizationStatusForMediaType_(
+            AVFoundation.AVMediaTypeAudio) == 3
+    except Exception:
+        pass
+    lines.append("macOS permission check:")
+    lines.append(f"  Screen Recording: {'GRANTED' if ok_screen else 'MISSING — needed for screenshots, screen reading, and click automation'}")
+    lines.append(f"  Accessibility: {'GRANTED' if ok_ax else 'MISSING — needed for keystrokes, window control, and Push-to-Talk'}")
+    _cam_msg = {True: "GRANTED", False: "MISSING — needed for hand gestures and camera features",
+                None: "unknown (open the Camera app once to trigger the prompt)"}
+    lines.append(f"  Camera: {_cam_msg[bool(ok_cam)] if ok_cam is not None else _cam_msg[None]}")
+    _mic_msg = {True: "GRANTED", False: "MISSING — needed for voice input",
+                None: "prompted automatically on first use"}
+    lines.append(f"  Microphone: {_mic_msg[bool(ok_mic)] if ok_mic is not None else _mic_msg[None]}")
+    if not ok_screen or not ok_ax or not ok_cam:
+        lines.append("Fix: System Settings → Privacy & Security → enable your terminal app "
+                     "(Terminal, iTerm, or your IDE) under Screen Recording, Accessibility "
+                     "and Camera, then restart Celestia.")
+    else:
+        lines.append("All permissions granted. Celestia has full control.")
+    return "\n".join(lines)
+
 def dark_mode():
     if _OS == "Darwin":
         subprocess.run(["osascript", "-e",
@@ -652,6 +832,14 @@ ACTION_MAP: dict[str, callable] = {
     "toggle_wifi":         toggle_wifi,
     "restart":             restart_computer,
     "shutdown":            shutdown_computer,
+    "keep_awake":          keep_awake,
+    "stay_awake":          keep_awake,
+    "allow_sleep":         allow_sleep,
+    "let_sleep":           allow_sleep,
+    "empty_trash":         empty_trash,
+    "empty_recycle_bin":   empty_trash,
+    "check_permissions":   check_permissions,
+    "permissions":         check_permissions,
 }
 
 # ── What needs a human, and what just needs an undo ──────────────────────────
@@ -705,6 +893,11 @@ _ALIASES = {
     "mute":            ("silence", "sound off", "no sound"),
     "brightness_up":   ("brighter", "raise brightness", "increase brightness"),
     "brightness_down": ("dimmer", "dim", "lower brightness", "decrease brightness"),
+    "brightness_set":  ("set brightness", "brightness to"),
+    "keep_awake":      ("keep awake", "stay awake", "don't sleep", "prevent sleep", "caffeinate"),
+    "allow_sleep":     ("allow sleep", "let sleep", "sleep allowed"),
+    "empty_trash":     ("empty trash", "empty recycle bin", "clear trash", "take out the trash"),
+    "check_permissions": ("check permissions", "permissions", "permission check", "privacy permissions"),
     "close_window":    ("close this", "close it"),
     "full_screen":     ("fullscreen", "maximise screen"),
     "show_desktop":    ("minimise everything", "go to desktop"),
@@ -720,7 +913,7 @@ _ALIASES = {
     "restart":         ("reboot", "restart the pc"),
 }
 
-_VALUE_ACTIONS = {"volume_set", "type_text", "press_key", "reload_n",
+_VALUE_ACTIONS = {"volume_set", "brightness_set", "type_text", "press_key", "reload_n",
                   "scroll_up", "scroll_down"}
 
 
@@ -751,6 +944,10 @@ def _detect_action(description: str) -> dict:
     num = re.search(r"(\d{1,3})\s*%?", low)
     if num and any(w in low for w in ("volume", "ses", "sound", "lautstark", "громкость")):
         return {"action": "volume_set", "value": max(0, min(100, int(num.group(1))))}
+
+    # 2b. "set brightness to 70" — a number next to a brightness word.
+    if num and any(w in low for w in ("brightness", "bright", "parlak", "helligkeit", "яркост")):
+        return {"action": "brightness_set", "value": max(0, min(100, int(num.group(1))))}
 
     # 3. Alias phrases.
     for action, phrases in _ALIASES.items():
@@ -840,6 +1037,18 @@ def computer_settings(
         except Exception as e:
             return f"Could not set volume: {e}"
 
+    if action == "brightness_set":
+        try:
+            target = int(value if value is not None else 50)
+            before = brightness_get()
+            brightness_set(target)
+            if before is not None:
+                push_undo(f"brightness {before}% → {target}%",
+                          lambda b=before: (brightness_set(b), f"Back to {b}%.")[1])
+            return f"Brightness set to {target}%."
+        except Exception as e:
+            return f"Could not set brightness: {e}"
+
     if action in ("type_text", "write_on_screen", "type", "write"):
         text = str(value or params.get("text", "")).strip()
         if not text:
@@ -886,7 +1095,7 @@ def computer_settings(
         _before = ("brightness", brightness_get())
 
     try:
-        func()
+        outcome = func()
     except Exception as e:
         print(f"[Settings] Action failed ({action}): {e}")
         return f"Action failed ({action}): {e}"
@@ -904,14 +1113,21 @@ def computer_settings(
         # A pure toggle: calling it again is the undo.
         push_undo("dark mode toggled",
                   lambda: (dark_mode(), "Theme switched back.")[1])
+    elif action in ("keep_awake", "stay_awake"):
+        push_undo("keep awake on",
+                  lambda: (allow_sleep(), "Sleep allowed again.")[1])
 
+    # Actions that produce their own report (permissions, keep-awake, trash)
+    # speak for themselves; the rest get the generic receipt.
+    if isinstance(outcome, str) and outcome.strip():
+        return outcome
     return f"Done: {action}."
 
 
 # ── Tool declaration (auto-discovered by core/action_loader.py) ──────────────
 TOOL = {
     "name": "computer_settings",
-    "description": "Controls the computer: volume, brightness, window management, keyboard shortcuts, typing text on screen, closing apps, fullscreen, dark mode, WiFi, restart, shutdown, scrolling, tab management, zoom, screenshots, lock screen, refresh/reload page. Use for ANY single computer control command. restart, shutdown and toggle_wifi put a confirmation on the user's screen and do NOT happen until they press it — never claim they are done. Volume, brightness and dark mode can be reversed with the `undo` tool.",
+    "description": "Controls the computer: volume, brightness, window management, keyboard shortcuts, typing text on screen, closing apps, fullscreen, dark mode, WiFi, restart, shutdown, keep-awake, empty trash, permission check, scrolling, tab management, zoom, screenshots, lock screen, refresh/reload page. Use for ANY single computer control command. restart, shutdown and toggle_wifi put a confirmation on the user's screen and do NOT happen until they press it — never claim they are done. Volume, brightness and dark mode can be reversed with the `undo` tool.",
     "parameters": {
         "type": "OBJECT",
         "properties": {
@@ -930,7 +1146,7 @@ TOOL = {
                 "description": (
                     "The exact action. Prefer this over `description` — pick one of: "
                     "volume_up | volume_down | volume_set | mute | "
-                    "brightness_up | brightness_down | sleep_display | "
+                    "brightness_up | brightness_down | brightness_set | sleep_display | "
                     "pause_video | close_app | close_window | full_screen | "
                     "minimize | maximize | snap_left | snap_right | "
                     "switch_window | show_desktop | task_manager | focus_search | "
@@ -941,6 +1157,7 @@ TOOL = {
                     "undo | redo | select_all | save | enter | escape | press_key | "
                     "type_text | screenshot | lock_screen | open_settings | "
                     "file_explorer | open_run | dark_mode | toggle_wifi | "
+                    "keep_awake | allow_sleep | empty_trash | check_permissions | "
                     "restart | shutdown"
                 )
             },

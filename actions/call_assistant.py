@@ -2,8 +2,8 @@
 Autonomous AI Call Attendant & Call Screening Assistant ("Call Proxy")
 Part of Brahma AI.
 
-Allows Brahma AI Evo to autonomously answer voice/video calls on Windows
-(WhatsApp, Teams, Phone Link, Zoom, Skype, etc.), introduce itself as the user's
+Allows Celestia to autonomously answer voice/video calls
+(WhatsApp, Teams, Zoom, Skype, etc.), introduce itself as the user's
 AI executive assistant, converse with the caller, transcribe the dialogue in real time,
 record messages and urgency, and deliver a structured debriefing card.
 """
@@ -466,7 +466,7 @@ class CallAssistant:
             from google.genai import types
             client = genai.Client(api_key=api_key, http_options={"api_version": "v1beta"})
             response = client.models.generate_content(
-                model="gemini-2.5-flash-lite",
+                model="gemini-3.8-flash",
                 contents=[
                     types.Part.from_bytes(data=wav_bytes, mime_type="audio/wav"),
                     "Transcribe the spoken audio verbatim. Return only the transcribed text, nothing else.",
@@ -482,7 +482,7 @@ class CallAssistant:
         api_key = _get_api_key()
         history_str = "\n".join(f"{t['speaker']}: {t['text']}" for t in self.transcript[-6:])
 
-        prompt = f"""You are Brahma AI Evo, an executive AI assistant answering a live phone call on behalf of {self.owner_name}.
+        prompt = f"""You are Celestia, an executive AI assistant answering a live phone call on behalf of {self.owner_name}.
 {self.owner_name} is currently occupied and unavailable to pick up.
 Caller: {self.caller_name} (App: {self.app_name}).
 
@@ -502,7 +502,7 @@ Guidelines:
                 from google import genai
                 client = genai.Client(api_key=api_key, http_options={"api_version": "v1beta"})
                 resp = client.models.generate_content(
-                    model="gemini-2.5-flash-lite",
+                    model="gemini-3.8-flash",
                     contents=prompt,
                 )
                 txt = (getattr(resp, "text", "") or "").strip()
@@ -532,7 +532,7 @@ Rules:
                 from google import genai
                 client = genai.Client(api_key=api_key, http_options={"api_version": "v1beta"})
                 resp = client.models.generate_content(
-                    model="gemini-2.5-flash-lite",
+                    model="gemini-3.8-flash",
                     contents=prompt,
                 )
                 txt = (getattr(resp, "text", "") or "").strip().strip('"')
@@ -561,7 +561,7 @@ Rules:
             try:
                 from google import genai
                 client = genai.Client(api_key=api_key, http_options={"api_version": "v1beta"})
-                sum_prompt = f"""Summarize this phone call screened by Brahma AI Evo on behalf of {self.owner_name}:
+                sum_prompt = f"""Summarize this phone call screened by Celestia on behalf of {self.owner_name}:
 Caller: {self.caller_name}
 Duration: {duration_str}
 
@@ -576,7 +576,7 @@ Output a clean JSON object:
 }}
 """
                 resp = client.models.generate_content(
-                    model="gemini-2.5-flash-lite",
+                    model="gemini-3.8-flash",
                     contents=sum_prompt,
                     config={"response_mime_type": "application/json"}
                 )

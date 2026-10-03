@@ -394,7 +394,7 @@ Do NOT include markdown fences outside the JSON. Return only the valid JSON obje
             try:
                 from google import genai
                 g_client = genai.Client(api_key=gemini_key, http_options={"api_version": "v1beta"})
-                for model_name in ("gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"):
+                for model_name in ("gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"):
                     try:
                         resp = g_client.models.generate_content(
                             model=model_name,
