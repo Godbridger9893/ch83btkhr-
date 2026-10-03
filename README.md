@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="assets/brahma_evo_logo.png" alt="Celestia Logo" width="220" />
+<img src="assets/celestia_banner.png" alt="Celestia Logo" width="220" />
 
 ### *The Self-Evolving, Multimodal Personal AI Desktop Environment*
 
@@ -122,7 +122,7 @@
    ```
    *Or launch using the included batch file:*
    ```cmd
-   start_brahma.bat
+   start_celestia.bat
    ```
 
 ### Installation — macOS (production-ready)
@@ -147,7 +147,7 @@
 
 3. **Launch:**
    ```zsh
-   ./start_brahma.sh
+   ./start_celestia.sh
    ```
 
 4. **Grant macOS permissions** (required for full control) — or just say
@@ -209,14 +209,14 @@ Celestia/
 │   ├── circuit_schematic.py    # Modular circuit schematic feature
 │   └── spotify_mcp.py          # Modular Spotify feature
 ├── smart_home/                 # Smart device provider & discovery services
-└── brahma-connect-android/     # Companion Android mobile application
+└── celestia-connect-android/   # Companion Android mobile application
 ```
 
 ---
 
 ## 🔒 Security & Privacy
 
-- All long-term memories, credentials, and configuration files are stored locally in `%LOCALAPPDATA%\BrahmaAI\`.
+- All long-term memories, credentials, and configuration files are stored locally in `%LOCALAPPDATA%\CelestiaAI\` (macOS/Linux: `~/CelestiaAI/`).
 - External tools run through permission sentries and the isolated Crucible sandbox.
 - Audio and video frames are only streamed during active conversation sessions.
 

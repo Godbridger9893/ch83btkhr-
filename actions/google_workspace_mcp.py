@@ -270,9 +270,9 @@ class GoogleCalendarEngine:
 class GoogleDriveEngine:
     @classmethod
     def search_files(cls, query: str) -> str:
-        """Searches Google Drive or local Brahma AI generated files."""
-        # Search Desktop/BrahmaAI folder
-        desktop_ai = Path.home() / "Desktop" / "BrahmaAI"
+        """Searches Google Drive or local Celestia generated files."""
+        # Search Desktop/CelestiaAI folder
+        desktop_ai = Path.home() / "Desktop" / "CelestiaAI"
         if not desktop_ai.exists():
             return f"No Drive or local files found for query '{query}'."
 
@@ -283,12 +283,12 @@ class GoogleDriveEngine:
                 matches.append(f"- {f.name} ({round(f.stat().st_size / 1024, 1)} KB)")
 
         if matches:
-            return "Found files in Brahma Workspace:\n" + "\n".join(matches)
+            return "Found files in Celestia Workspace:\n" + "\n".join(matches)
         return f"No files matching '{query}' found."
 
     @classmethod
     def read_file(cls, filename: str) -> str:
-        desktop_ai = Path.home() / "Desktop" / "BrahmaAI"
+        desktop_ai = Path.home() / "Desktop" / "CelestiaAI"
         target = desktop_ai / filename
         if not target.exists():
             for f in desktop_ai.glob("*.*"):
@@ -312,8 +312,8 @@ class GoogleDriveEngine:
         p = Path(local_path)
         if not p.exists():
             return f"Local file '{local_path}' does not exist."
-        # Store in BrahmaAI cloud staging
-        dest = Path.home() / "Desktop" / "BrahmaAI" / p.name
+        # Store in Celestia cloud staging
+        dest = Path.home() / "Desktop" / "CelestiaAI" / p.name
         try:
             import shutil
             shutil.copy2(p, dest)

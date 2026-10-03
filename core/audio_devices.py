@@ -1,12 +1,12 @@
 """
-core/audio_devices.py — pick which microphone and which speakers Brahma uses.
+core/audio_devices.py — pick which microphone and which speakers Celestia uses.
 
 WHY
     Both audio streams in main.py were opened without a `device=` argument, so
     they always took whatever the operating system called "default". On a laptop
     with a built-in mic, a webcam mic and a headset that is a coin toss — and on
     Windows the default *moves on its own* the moment you plug a headset in.
-    "Brahma can't hear me" almost always means "Brahma is listening to the
+    "Celestia can't hear me" almost always means "Celestia is listening to the
     monitor's microphone".
 
 WHY NAMES, NOT INDICES
@@ -252,7 +252,7 @@ _PSEUDO_DEVICES = (
 # Virtual loopback / meeting-routing devices. They are REAL endpoints (so they
 # are listed and remain selectable by name), but they must never win the
 # *default* slot: on a Mac with BlackHole/Loopback installed, "first available
-# input" would otherwise be a silent virtual cable and Brahma hears nothing.
+# input" would otherwise be a silent virtual cable and Celestia hears nothing.
 _VIRTUAL_DEVICES = (
     "blackhole",
     "soundflower",

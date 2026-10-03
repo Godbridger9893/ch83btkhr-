@@ -1,0 +1,35 @@
+[
+    {
+        "input": {}
+    },
+    {
+        "input": {
+            "topic": "finance",
+            "count": 3
+        }
+    },
+    {
+        "input": {
+            "topic": "health",
+            "count": 2
+        }
+    },
+    {
+        "input": {
+            "topic": "productivity",
+            "count": 10
+        }
+    },
+    {
+        "input": {
+            "topic": "unknown_topic",
+            "count": 1
+        }
+    },
+    {
+        "input": {
+            "topic": "general",
+            "count": 7
+        }
+    }
+]

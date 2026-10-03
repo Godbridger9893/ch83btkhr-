@@ -76,7 +76,7 @@ except Exception:
 from discord_bot import DiscordBotService
 from gesture_utils import estimate_gesture_state, GestureTracker
 from smart_home import SmartHomeService
-from smart_home_page_new import BrahmaHomePage, _DeviceTile
+from smart_home_page_new import CelestiaHomePage, _DeviceTile
 from workspace_store import store as workspace_store
 from core.identity import identity
 from sound_manager import sound_mgr
@@ -121,8 +121,8 @@ CONFIG_DIR = get_user_data_dir() / "config"
 API_FILE   = CONFIG_DIR / "api_keys.json"
 APP_SETTINGS_FILE = CONFIG_DIR / "app_settings.json"
 DISCORD_SETTINGS_FILE = CONFIG_DIR / "discord_bot.json"
-LOGO_FILE  = BASE_DIR / "assets" / "Brahma_Lite_Logo.png"
-LOGO_ICO   = BASE_DIR / "assets" / "Brahma_Lite_Logo.ico"
+LOGO_FILE  = BASE_DIR / "assets" / "Celestia_Logo.png"
+LOGO_ICO   = BASE_DIR / "assets" / "Celestia_Logo.ico"
 BACKGROUND_IMAGE_FILE = BASE_DIR / "assets" / "background.png"
 MODEL_DOWNLOAD_URL = "https://storage.googleapis.com/mediapipe-assets/hand_landmarker.task"
 
@@ -366,7 +366,7 @@ class BackgroundWidget(QWidget):
                 st = (state or "IDLE").strip().replace("'", "\\'")
                 page = self._web_view.page()
                 if page:
-                    page.runJavaScript(f"if(window.setBrahmaState) window.setBrahmaState('{st}');")
+                    page.runJavaScript(f"if(window.setCelestiaState) window.setCelestiaState('{st}');")
             except Exception:
                 pass
 
@@ -733,7 +733,7 @@ class DailyBriefingOverlay(QWidget):
         hdr_info = QVBoxLayout()
         hdr_info.setSpacing(2)
 
-        title_lbl = QLabel("⚡ BRAHMA INTELLIGENCE // UNIFIED MORNING BRIEFING")
+        title_lbl = QLabel("⚡ CELESTIA INTELLIGENCE // UNIFIED MORNING BRIEFING")
         title_lbl.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         title_lbl.setStyleSheet(f"color: {C.PRI}; letter-spacing: 1.5px; background: transparent; border: none;")
         hdr_info.addWidget(title_lbl)
@@ -1216,7 +1216,7 @@ class MemoryInspectorOverlay(QWidget):
 
         from memory.memory_manager import all_entries_for_ui
 
-        hdr = QLabel("🧠  WHAT BRAHMA REMEMBERS")
+        hdr = QLabel("🧠  WHAT CELESTIA REMEMBERS")
         hdr.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
         hdr.setStyleSheet(f"color: {C.PRI}; background: transparent; letter-spacing: 0.5px;")
         self._lay.addWidget(hdr)
@@ -1232,7 +1232,7 @@ class MemoryInspectorOverlay(QWidget):
 
         cap = QLabel(
             f"{len(rows)} stored memory entries. Stored locally in memory/long_term.json. "
-            f"Brahma recalls these during relevant conversations."
+            f"Celestia recalls these during relevant conversations."
         )
         cap.setWordWrap(True)
         cap.setFont(QFont("Segoe UI", 8))
@@ -4626,15 +4626,15 @@ class SmallPanelCard(QFrame):
         self._body_lbl.setStyleSheet(f"color: {accent}; background: transparent;")
         lay.addWidget(self._body_lbl)
 
-class BrahmaTelemetryWing(QFrame):
+class CelestiaTelemetryWing(QFrame):
     """
-    Brahma Right Wing: Live Operations, Research Streams, and Sources.
+    Celestia Right Wing: Live Operations, Research Streams, and Sources.
     Auto-dismisses in 10 seconds unless pinned or hovered.
     Adapts dynamically to the active theme color (Amber Gold by default).
     """
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setObjectName("BrahmaTelemetryWing")
+        self.setObjectName("CelestiaTelemetryWing")
         self.setFixedWidth(310)
         self.setMinimumHeight(320)
         self.setMaximumHeight(520)
@@ -4762,7 +4762,7 @@ class BrahmaTelemetryWing(QFrame):
         self._theme_rgb = (r, g, b)
 
         self.setStyleSheet(f"""
-            QFrame#BrahmaTelemetryWing {{
+            QFrame#CelestiaTelemetryWing {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
                     stop:0 rgba(10, 15, 24, 238),
                     stop:0.6 rgba(6, 10, 18, 222),
@@ -4939,16 +4939,16 @@ class BrahmaTelemetryWing(QFrame):
         self._anim.start()
 
 
-class BrahmaResultWing(QFrame):
+class CelestiaResultWing(QFrame):
     """
-    Brahma Left Wing: Final Results, Generated Deliverables (PDF/Word/Media/Code),
+    Celestia Left Wing: Final Results, Generated Deliverables (PDF/Word/Media/Code),
     Executive Summary Bullets, and Quick Action Buttons.
     Auto-dismisses in 10 seconds unless pinned or hovered.
     Adapts dynamically to the active theme color (Amber Gold by default).
     """
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setObjectName("BrahmaResultWing")
+        self.setObjectName("CelestiaResultWing")
         self.setFixedWidth(310)
         self.setMinimumHeight(320)
         self.setMaximumHeight(540)
@@ -5100,7 +5100,7 @@ class BrahmaResultWing(QFrame):
         self._theme_rgb = (r, g, b)
 
         self.setStyleSheet(f"""
-            QFrame#BrahmaResultWing {{
+            QFrame#CelestiaResultWing {{
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
                     stop:0 rgba(14, 18, 26, 240),
                     stop:0.6 rgba(9, 13, 20, 225),
@@ -5289,14 +5289,14 @@ class BrahmaResultWing(QFrame):
         if self._active_file_path:
             p = Path(self._active_file_path).resolve()
             if p.exists() and not _open_native(p):
-                print(f"[BrahmaResultWing] Open file failed: {p}")
+                print(f"[CelestiaResultWing] Open file failed: {p}")
 
     def _on_reveal_clicked(self):
         if self._active_file_path:
             p = Path(self._active_file_path).resolve()
             target = p if p.exists() else p.parent
             if not _open_native(target, reveal=p.exists()):
-                print(f"[BrahmaResultWing] Reveal error: {target}")
+                print(f"[CelestiaResultWing] Reveal error: {target}")
 
     def set_body(self, text: str):
         if hasattr(self, "_summary_lbl") and text:
@@ -5851,7 +5851,7 @@ class SetupOverlay(QWidget):
         self._stack.addWidget(page)
 
     def _save_identity_and_next(self):
-        identity.set_assistant_name(self._inp_ast.text().strip() or "Brahma")
+        identity.set_assistant_name(self._inp_ast.text().strip() or "Celestia")
         identity.set_application_name(self._inp_app.text().strip() or "Celestia")
         self._stack.setCurrentIndex(2)
 
@@ -7679,7 +7679,7 @@ class BootSequenceOverlay(QWidget):
                     painter.drawEllipse(QPointF(s['x'], s['y']), s['size'], s['size'])
 
             # -------------------------------------------------------------
-            # 3. DRAW "BRAHMA" TEXT & TYPOGRAPHY EFFECT
+            # 3. DRAW "CELESTIA" TEXT & TYPOGRAPHY EFFECT
             # -------------------------------------------------------------
             if self._time >= 1.35:
                 text_t = min(1.0, (self._time - 1.35) / 0.45)
@@ -7688,17 +7688,17 @@ class BootSequenceOverlay(QWidget):
                 spacing_prog = min(1.0, (self._time - 1.35) / 1.5)
                 letter_spacing = 10.0 + (spacing_prog * 14.0)
 
-                font_brahma = QFont("Segoe UI", 56, QFont.Weight.Black)
-                font_brahma.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, letter_spacing)
-                painter.setFont(font_brahma)
+                font_celestia = QFont("Segoe UI", 56, QFont.Weight.Black)
+                font_celestia.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, letter_spacing)
+                painter.setFont(font_celestia)
 
-                rect_brahma = QRectF(cx - 500, cy - 85, 1000, 90)
+                rect_celestia = QRectF(cx - 500, cy - 85, 1000, 90)
 
                 # Outer text cyan glow
                 glow_col = QColor(0, 240, 255, int(text_alpha * 0.45))
                 painter.setPen(glow_col)
                 for ox, oy in [(-2, 0), (2, 0), (0, -2), (0, 2), (-1, -1), (1, 1)]:
-                    painter.drawText(rect_brahma.translated(ox, oy), Qt.AlignmentFlag.AlignCenter, "BRAHMA")
+                    painter.drawText(rect_celestia.translated(ox, oy), Qt.AlignmentFlag.AlignCenter, "CELESTIA")
 
                 # Core white text with dynamic shimmer
                 if 1.8 <= self._time < 2.5:
@@ -7713,10 +7713,10 @@ class BootSequenceOverlay(QWidget):
                 else:
                     painter.setPen(QColor(255, 255, 255, text_alpha))
 
-                painter.drawText(rect_brahma, Qt.AlignmentFlag.AlignCenter, "BRAHMA")
+                painter.drawText(rect_celestia, Qt.AlignmentFlag.AlignCenter, "CELESTIA")
 
             # -------------------------------------------------------------
-            # 4. DRAW "AI - EVO" WITH MAXIMUM IMPACT (>= 2.5s)
+            # 4. DRAW "AI - CELESTIA" WITH MAXIMUM IMPACT (>= 2.5s)
             # -------------------------------------------------------------
             if self._time >= 2.5:
                 evo_dt = self._time - 2.5
@@ -7746,17 +7746,17 @@ class BootSequenceOverlay(QWidget):
                 painter.setPen(QColor(220, 230, 245, evo_alpha))
                 painter.drawText(QRectF(-badge_w / 2.0, -badge_h / 2.0, 125, badge_h), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, "AI - ")
 
-                font_evo = QFont("Segoe UI", 20, QFont.Weight.Black)
-                font_evo.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 5.0)
+                font_evo = QFont("Segoe UI", 13, QFont.Weight.Black)
+                font_evo.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 3.0)
                 painter.setFont(font_evo)
 
                 evo_glow = QColor(0, 240, 255, int(evo_alpha * 0.6))
                 painter.setPen(evo_glow)
                 for ox, oy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                    painter.drawText(QRectF(-badge_w / 2.0 + 130, -badge_h / 2.0, 115, badge_h).translated(ox, oy), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "EVO")
+                    painter.drawText(QRectF(-badge_w / 2.0 + 130, -badge_h / 2.0, 115, badge_h).translated(ox, oy), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "CELESTIA")
 
                 painter.setPen(QColor(0, 240, 255, evo_alpha))
-                painter.drawText(QRectF(-badge_w / 2.0 + 130, -badge_h / 2.0, 115, badge_h), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "EVO")
+                painter.drawText(QRectF(-badge_w / 2.0 + 130, -badge_h / 2.0, 115, badge_h), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "CELESTIA")
 
                 painter.restore()
 
@@ -8407,7 +8407,7 @@ class FloatingLauncher(QWidget):
         hide_act.triggered.connect(self.hide)
         menu.addAction(hide_act)
 
-        quit_act = QAction("Quit Brahma", self)
+        quit_act = QAction("Quit Celestia", self)
         quit_act.triggered.connect(lambda: self.action_requested.emit("quit"))
         menu.addAction(quit_act)
 
@@ -8938,10 +8938,10 @@ class MainWindow(QMainWindow):
                 winreg.KEY_READ | winreg.KEY_WRITE,
             ) as key:
                 try:
-                    value, _ = winreg.QueryValueEx(key, "Brahma Celestia")
+                    value, _ = winreg.QueryValueEx(key, "Brahma Evo")
                     run_value = _startup_run_value()
                     if value != run_value:
-                        winreg.SetValueEx(key, "Brahma Celestia", 0, winreg.REG_SZ, run_value)
+                        winreg.SetValueEx(key, "Brahma Evo", 0, winreg.REG_SZ, run_value)
                     return bool(value)
                 except FileNotFoundError:
                     return False
@@ -8955,10 +8955,10 @@ class MainWindow(QMainWindow):
         try:
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, _startup_registry_key()) as key:
                 if enabled:
-                    winreg.SetValueEx(key, "Brahma Celestia", 0, winreg.REG_SZ, run_value)
+                    winreg.SetValueEx(key, "Brahma Evo", 0, winreg.REG_SZ, run_value)
                 else:
                     try:
-                        winreg.DeleteValue(key, "Brahma Celestia")
+                        winreg.DeleteValue(key, "Brahma Evo")
                     except FileNotFoundError:
                         pass
             return True
@@ -9110,8 +9110,8 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
-    def set_brahma_connect_service(self, service):
-        self._brahma_connect = service
+    def set_celestia_connect_service(self, service):
+        self._celestia_connect = service
         if hasattr(self, "_devices_page"):
             self._devices_page.set_service(service)
             if service is not None:
@@ -9766,7 +9766,7 @@ class MainWindow(QMainWindow):
             ph_map = {
                 "LISTENING": "Listening... (or type your command)",
                 "SPEAKING": "Celestia is responding...",
-                "THINKING": "Brahma is thinking...",
+                "THINKING": "Celestia is thinking...",
                 "PROCESSING": "Processing request...",
                 "EXECUTING": "Executing action...",
                 "WORKING": "Working on it...",
@@ -9779,7 +9779,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_inline_workspace") and hasattr(self._inline_workspace, "_footer_status"):
             foot_map = {
                 "LISTENING": "● Listening for voice command...",
-                "SPEAKING": "● Brahma is speaking...",
+                "SPEAKING": "● Celestia is speaking...",
                 "THINKING": "● Thinking...",
                 "PROCESSING": "● Processing...",
                 "EXECUTING": "● Executing system command...",
@@ -10115,8 +10115,8 @@ class MainWindow(QMainWindow):
         self._developer_card.hide()
         self._developer_status_lbl = QLabel(self._hidden_legacy_container)
 
-        self._hud_result_wing = BrahmaResultWing(self)
-        self._hud_telemetry_wing = BrahmaTelemetryWing(self)
+        self._hud_result_wing = CelestiaResultWing(self)
+        self._hud_telemetry_wing = CelestiaTelemetryWing(self)
         self._command_card = self._hud_result_wing
         self._result_card = self._hud_telemetry_wing
 
@@ -10155,8 +10155,8 @@ class MainWindow(QMainWindow):
         cmd_lay.addLayout(self._build_command_row())
         stage.addWidget(self._command_panel)
 
-        self._home_page = BrahmaHomePage()
-        self._devices_page = BrahmaConnectDevicesPage(self)
+        self._home_page = CelestiaHomePage()
+        self._devices_page = CelestiaConnectDevicesPage(self)
         self._center_stack = QStackedWidget()
         self._center_stack.setStyleSheet("background: transparent; border: none;")
         self._center_stack.addWidget(w)
@@ -10196,7 +10196,7 @@ class MainWindow(QMainWindow):
         pulse_dot.setStyleSheet("color: #37ff5f; background: transparent;")
         header_bar.addWidget(pulse_dot)
 
-        header_title = QLabel("BRAHMA CHAT")
+        header_title = QLabel("CELESTIA CHAT")
         header_title.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
         header_title.setStyleSheet(f"color: {C.WHITE}; background: transparent; letter-spacing: 1px;")
         header_bar.addWidget(header_title)
@@ -11058,7 +11058,7 @@ class SystemConnectivityPage(QWidget):
         ast_row = QHBoxLayout()
         ast_row.addWidget(QLabel("Assistant Name"))
         self._set_ast_name = QLineEdit(identity.get_assistant_name())
-        self._set_ast_name.textChanged.connect(lambda t: identity.set_assistant_name(t.strip() or "Brahma"))
+        self._set_ast_name.textChanged.connect(lambda t: identity.set_assistant_name(t.strip() or "Celestia"))
         ast_row.addWidget(self._set_ast_name)
         ilay.addLayout(ast_row)
         
@@ -11367,7 +11367,7 @@ class SystemConnectivityPage(QWidget):
 
         rule_input_row = QHBoxLayout()
         self._ah_rule_input = QLineEdit()
-        self._ah_rule_input.setPlaceholderText("Teach Brahma a rule (e.g. Always summarize in bullet points)")
+        self._ah_rule_input.setPlaceholderText("Teach Celestia a rule (e.g. Always summarize in bullet points)")
         rule_input_row.addWidget(self._ah_rule_input)
         self._ah_learn_btn = QPushButton("Teach Rule")
         self._ah_learn_btn.clicked.connect(self._handle_ah_learn_rule)
@@ -11385,7 +11385,7 @@ class SystemConnectivityPage(QWidget):
         except Exception:
             pass
 
-        # Brahma Audio Routing & Hardware Controls
+        # Celestia Audio Routing & Hardware Controls
         audio_card = self._card("Audio Routing & Hardware Controls", "Select hardware audio interfaces, toggle Push-to-Talk, or inspect long-term memory.")
         alay = audio_card.layout()
 
@@ -11707,7 +11707,7 @@ class SystemConnectivityPage(QWidget):
         self._update_ig_status()
         from PyQt6.QtWidgets import QMessageBox
         name_str = f" as @{detected_username}" if detected_username else ""
-        QMessageBox.information(self, "Instagram Connected", f"Instagram successfully connected via Browser{name_str}!\n\nBrahma is now active for voice DM notifications and instant direct replies.")
+        QMessageBox.information(self, "Instagram Connected", f"Instagram successfully connected via Browser{name_str}!\n\nCelestia is now active for voice DM notifications and instant direct replies.")
 
     def _ig_browser_error(self, err_msg):
         self._ig_browser_btn.setEnabled(True)
@@ -12283,7 +12283,7 @@ class SystemConnectivityPage(QWidget):
             AutoHealEngine.record_last_error(tb)
             self._ah_output_lbl.setText(
                 f"❌ Simulated bug triggered in test_action.py: {type(e).__name__}: {e}\n"
-                f"Traceback captured in AutoHealEngine! Click 'Fix Captured Bug' or say 'Brahma, fix that bug'."
+                f"Traceback captured in AutoHealEngine! Click 'Fix Captured Bug' or say 'Celestia, fix that bug'."
             )
 
     def _handle_ah_fix_captured_bug(self):
@@ -12712,7 +12712,7 @@ class SystemConnectivityPage(QWidget):
             # Base variables
             base_dir = Path(os.path.abspath("."))
             script_path = base_dir / "main.py"
-            icon_path = base_dir / "assets" / "Brahma_Lite_Logo.ico"
+            icon_path = base_dir / "assets" / "Celestia_Logo.ico"
             
             python_exe = sys.executable
             if not python_exe:
@@ -13456,7 +13456,7 @@ class _ConnectDeviceCard(QFrame):
         super().mouseReleaseEvent(event)
 
 
-class BrahmaConnectDevicesPage(QFrame):
+class CelestiaConnectDevicesPage(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._service = None
@@ -13467,9 +13467,9 @@ class BrahmaConnectDevicesPage(QFrame):
         self._selected_device_id: str | None = None
         self._onboarding_known_device_ids: set[str] = set()
 
-        self.setObjectName("BrahmaConnectDevicesPage")
+        self.setObjectName("CelestiaConnectDevicesPage")
         self.setStyleSheet(f"""
-            QFrame#BrahmaConnectDevicesPage {{
+            QFrame#CelestiaConnectDevicesPage {{
                 background: transparent;
                 border: none;
             }}
@@ -13843,7 +13843,7 @@ class BrahmaConnectDevicesPage(QFrame):
         self._onboarding_pulse = 0
 
     def _service_obj(self):
-        return self._service or getattr(self.parentWidget(), "_brahma_connect", None)
+        return self._service or getattr(self.parentWidget(), "_celestia_connect", None)
 
     def set_service(self, service):
         self._service = service
@@ -14100,7 +14100,7 @@ class _RootShim:
         pass
 
 
-class BrahmaUI:
+class CelestiaUI:
     def __init__(self, face_path: str, size=None, *, show_immediately: bool = True):
         self._app = QApplication.instance() or QApplication(sys.argv)
         self._app.setStyle("Fusion")
@@ -14199,8 +14199,8 @@ class BrahmaUI:
     def _make_app_icon(self) -> QIcon:
         return _logo_icon()
 
-    def set_brahma_connect_service(self, service):
-        self._win.set_brahma_connect_service(service)
+    def set_celestia_connect_service(self, service):
+        self._win.set_celestia_connect_service(service)
 
 
     

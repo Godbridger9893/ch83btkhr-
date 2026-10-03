@@ -70,7 +70,7 @@ except Exception:
 import sounddevice as sd
 from google import genai
 from google.genai import types
-from ui import BrahmaUI
+from ui import CelestiaUI
 from memory.memory_manager import (
     load_memory, update_memory, format_memory_for_prompt,
     should_extract_memory, extract_memory, auto_learn_interaction
@@ -92,7 +92,7 @@ from actions.file_controller   import file_controller
 from actions.office_builder     import create_presentation, create_spreadsheet
 from actions.docx_tools        import word_document
 from actions.pdf_tools         import create_pdf
-from actions.brahma_connect    import (
+from actions.celestia_connect    import (
     connect_list_devices,
     connect_get_device,
     connect_get_capabilities,
@@ -125,9 +125,9 @@ except ImportError:
         start_ig_daemon = None
 
 try:
-    from brahma_connect.service import get_service as get_brahma_connect_service
+    from celestia_connect.service import get_service as get_celestia_connect_service
 except Exception:
-    get_brahma_connect_service = None
+    get_celestia_connect_service = None
 
 
 def get_base_dir():
@@ -189,7 +189,7 @@ def _ensure_desktop_shortcut() -> None:
         desktop_dir.mkdir(parents=True, exist_ok=True)
         shortcut_path = desktop_dir / "Brahma Celestia.lnk"
         script_path = BASE_DIR / "main.py"
-        icon_path = BASE_DIR / "assets" / "Brahma_Lite_Logo.ico"
+        icon_path = BASE_DIR / "assets" / "Celestia_Logo.ico"
 
         if not icon_path.exists():
             icon_path = None
@@ -645,11 +645,11 @@ def _build_task_plan(text: str) -> list[str]:
 
 _last_memory_input = ""
 
-def _update_memory_async(user_text: str, brahma_text: str) -> None:
+def _update_memory_async(user_text: str, celestia_text: str) -> None:
     global _last_memory_input
 
-    user_text   = (user_text   or "").strip()
-    brahma_text = (brahma_text or "").strip()
+    user_text     = (user_text     or "").strip()
+    celestia_text = (celestia_text or "").strip()
 
     if len(user_text) < 4 or user_text == _last_memory_input:
         return
@@ -657,7 +657,7 @@ def _update_memory_async(user_text: str, brahma_text: str) -> None:
 
     # Fast deterministic heuristic extraction (Pillar 5 - Living Knowledge Graph)
     try:
-        learned = auto_learn_interaction(user_text, brahma_text)
+        learned = auto_learn_interaction(user_text, celestia_text)
         if learned:
             print(f"[Memory] 🧠 Auto-learned: {list(learned.keys())}")
     except Exception as exc:
@@ -665,9 +665,9 @@ def _update_memory_async(user_text: str, brahma_text: str) -> None:
 
     try:
         api_key = _get_api_key()
-        if not should_extract_memory(user_text, brahma_text, api_key):
+        if not should_extract_memory(user_text, celestia_text, api_key):
             return
-        data = extract_memory(user_text, brahma_text, api_key)
+        data = extract_memory(user_text, celestia_text, api_key)
         if data:
             update_memory(data)
             print(f"[Memory] ✅ {list(data.keys())}")
@@ -2044,7 +2044,7 @@ TOOL_DECLARATIONS = [
 
 class BrahmaLive:
 
-    def __init__(self, ui: BrahmaUI, dashboard=None, dashboard_started: bool = False, enable_dashboard: bool = True):
+    def __init__(self, ui: CelestiaUI, dashboard=None, dashboard_started: bool = False, enable_dashboard: bool = True):
         self.ui             = ui
         self._smart_home    = SmartHomeService()
         self.session        = None
@@ -2771,7 +2771,7 @@ class BrahmaLive:
             self.ui.begin_task_workspace(text, _build_task_plan(text), source=source or "local")
         except Exception:
             pass
-        if source != "instagram" and self._handle_brahma_connect_command(text, source=source or "local"):
+        if source != "instagram" and self._handle_celestia_connect_command(text, source=source or "local"):
             return
         if self._handle_smart_home_command(text, source=source or "local"):
             return
@@ -2941,7 +2941,7 @@ class BrahmaLive:
         candidate = re.sub(r"\s+", " ", candidate)
         return candidate
 
-    def _handle_brahma_connect_command(self, text: str, source: str = "local") -> bool:
+    def _handle_celestia_connect_command(self, text: str, source: str = "local") -> bool:
         normalized = re.sub(r"\s+", " ", re.sub(r"[^a-z0-9\s%]", " ", text.lower())).strip()
         
         # Explicit mobile indicators: only route to phone if user explicitly mentions phone/mobile
@@ -4935,7 +4935,7 @@ def main():
     except Exception as exc:
         _startup_log(f"GitHub update skipped: {exc}")
     _ensure_desktop_shortcut()
-    ui = BrahmaUI(str(BASE_DIR / "assets" / "Brahma_Lite_Logo.png"), show_immediately=True)
+    ui = CelestiaUI(str(BASE_DIR / "assets" / "Celestia_Logo.png"), show_immediately=True)
     dashboard = None
     dashboard_enabled = DashboardServer is not None and not _is_port_in_use(8000)
     if DashboardServer is not None and not dashboard_enabled:
@@ -4962,26 +4962,26 @@ def main():
         threading.Thread(target=_start_dashboard_server, daemon=True).start()
         _startup_log("dashboard thread spawned")
 
-    brahma_connect = None
-    brahma_connect_enabled = False
-    if get_brahma_connect_service is not None:
+    celestia_connect = None
+    celestia_connect_enabled = False
+    if get_celestia_connect_service is not None:
         try:
-            brahma_connect = get_brahma_connect_service(BASE_DIR)
-            brahma_connect_enabled = bool(brahma_connect.gateway.config.enabled)
+            celestia_connect = get_celestia_connect_service(BASE_DIR)
+            celestia_connect_enabled = bool(celestia_connect.gateway.config.enabled)
         except Exception as exc:
             _startup_log(f"brahma connect init failed: {exc}")
             try:
                 ui.write_log(f"ERR: Brahma Connect failed to initialize: {exc}")
             except Exception:
                 pass
-            brahma_connect = None
+            celestia_connect = None
     try:
-        if brahma_connect is not None and hasattr(ui, "set_brahma_connect_service"):
-            ui.set_brahma_connect_service(brahma_connect)
+        if celestia_connect is not None and hasattr(ui, "set_celestia_connect_service"):
+            ui.set_celestia_connect_service(celestia_connect)
     except Exception:
         pass
-    if brahma_connect is not None and brahma_connect_enabled:
-        connect_port = int(getattr(brahma_connect.gateway.config, "port", 8765))
+    if celestia_connect is not None and celestia_connect_enabled:
+        connect_port = int(getattr(celestia_connect.gateway.config, "port", 8765))
         if _is_port_in_use(connect_port):
             _startup_log(f"brahma connect disabled: port {connect_port} already in use")
             try:
@@ -4989,10 +4989,10 @@ def main():
             except Exception:
                 pass
         else:
-            def _start_brahma_connect_server():
+            def _start_celestia_connect_server():
                 try:
                     _startup_log("brahma connect thread started")
-                    brahma_connect.start_background()
+                    celestia_connect.start_background()
                     _startup_log("brahma connect thread spawned")
                 except Exception as exc:
                     _startup_log(f"brahma connect thread error: {exc}")
@@ -5001,7 +5001,7 @@ def main():
                     except Exception:
                         pass
 
-            threading.Thread(target=_start_brahma_connect_server, daemon=True).start()
+            threading.Thread(target=_start_celestia_connect_server, daemon=True).start()
 
 
 

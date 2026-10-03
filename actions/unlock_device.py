@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from actions.brahma_connect import connect_execute
+from actions.celestia_connect import connect_execute
 
 def _get_settings() -> dict:
     try:
@@ -34,7 +34,7 @@ def unlock_device(parameters: dict, response=None, player=None, session_memory=N
     # If not found, try to resolve the device to get its actual ID from connect gateway
     if not pin:
         try:
-            from actions.brahma_connect import connect_get_device
+            from actions.celestia_connect import connect_get_device
             res_str = connect_get_device({"target": target})
             res_dict = json.loads(res_str)
             if res_dict.get("success"):

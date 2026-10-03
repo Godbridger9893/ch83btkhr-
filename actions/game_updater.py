@@ -863,13 +863,13 @@ def _update_epic_games(epic_path: Path, game_name: str = None) -> str:
 
 
 def _schedule_daily_update(hour: int = 3, minute: int = 0) -> str:
-    task_name   = "BrahmaAI_GameUpdater"
+    task_name   = "CelestiaAI_GameUpdater"
     script_path = Path(__file__).resolve()
     if _OS != "Windows":
         # macOS launchd / Linux cron fallback — Windows schtasks path unchanged below.
         try:
             if _OS == "Darwin":
-                label = "com.brahma.gameupdater"
+                label = "com.celestia.gameupdater"
                 plist_dir = Path.home() / "Library" / "LaunchAgents"
                 plist_dir.mkdir(parents=True, exist_ok=True)
                 plist = plist_dir / f"{label}.plist"
@@ -909,8 +909,16 @@ def _schedule_daily_update(hour: int = 3, minute: int = 0) -> str:
 
 def _cancel_scheduled_update() -> str:
     if _OS == "Darwin":
-        plist = Path.home() / "Library" / "LaunchAgents" / "com.brahma.gameupdater.plist"
+        plist = Path.home() / "Library" / "LaunchAgents" / "com.celestia.gameupdater.plist"
         subprocess.run(["launchctl", "unload", str(plist)], capture_output=True)
+        # Legacy label from the pre-Celestia era — clean it too if present.
+        legacy = Path.home() / "Library" / "LaunchAgents" / "com.brahma.gameupdater.plist"
+        subprocess.run(["launchctl", "unload", str(legacy)], capture_output=True)
+        try:
+            if legacy.exists():
+                legacy.unlink()
+        except Exception:
+            pass
         try:
             if plist.exists():
                 plist.unlink()
@@ -922,25 +930,25 @@ def _cancel_scheduled_update() -> str:
         r = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
         if r.returncode != 0:
             return "No scheduled update found."
-        lines = [l for l in r.stdout.splitlines() if "BrahmaAI_GameUpdater" not in l]
+        lines = [l for l in r.stdout.splitlines() if "CelestiaAI_GameUpdater" not in l]
         subprocess.run(["crontab", "-"], input="\n".join(lines) + "\n",
                        capture_output=True, text=True)
         return "Scheduled update cancelled."
-    result = subprocess.run(["schtasks", "/Delete", "/TN", "BrahmaAI_GameUpdater", "/F"],
+    result = subprocess.run(["schtasks", "/Delete", "/TN", "CelestiaAI_GameUpdater", "/F"],
                             capture_output=True, text=True)
     return "Scheduled update cancelled." if result.returncode == 0 else "No scheduled update found."
 
 
 def _get_schedule_status() -> str:
     if _OS == "Darwin":
-        plist = Path.home() / "Library" / "LaunchAgents" / "com.brahma.gameupdater.plist"
+        plist = Path.home() / "Library" / "LaunchAgents" / "com.celestia.gameupdater.plist"
         return "Game update is scheduled (launchd)." if plist.exists() else "No scheduled game update found."
     if _OS == "Linux":
         r = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
-        if r.returncode == 0 and "BrahmaAI_GameUpdater" in r.stdout:
+        if r.returncode == 0 and "CelestiaAI_GameUpdater" in r.stdout:
             return "Game update is scheduled (cron)."
         return "No scheduled game update found."
-    result = subprocess.run(["schtasks", "/Query", "/TN", "BrahmaAI_GameUpdater", "/FO", "LIST"],
+    result = subprocess.run(["schtasks", "/Query", "/TN", "CelestiaAI_GameUpdater", "/FO", "LIST"],
                             capture_output=True, text=True)
     if result.returncode != 0:
         return "No scheduled game update found."

@@ -689,7 +689,7 @@ class _DeviceTile(ClickableFrame):
             self.select_requested.emit(str(device_id))
 
 
-class BrahmaHomePage(QWidget):
+class CelestiaHomePage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._service = SmartHomeService()
@@ -701,8 +701,8 @@ class BrahmaHomePage(QWidget):
         self._activity_items: list[dict[str, Any]] = []
         self._device_columns_cached = 0
 
-        self.setObjectName("BrahmaHomePageModern")
-        self.setStyleSheet(f"QWidget#BrahmaHomePageModern {{ background: transparent; }} QScrollArea {{ background: transparent; border: none; }}")
+        self.setObjectName("CelestiaHomePageModern")
+        self.setStyleSheet(f"QWidget#CelestiaHomePageModern {{ background: transparent; }} QScrollArea {{ background: transparent; border: none; }}")
 
         root = QHBoxLayout(self)
         root.setContentsMargins(18, 16, 18, 16)

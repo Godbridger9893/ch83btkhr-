@@ -70,7 +70,7 @@ class InstallThread(QThread):
                     shortcut = shell.CreateShortCut(shortcut_path)
                     shortcut.Targetpath = exe_path
                     shortcut.WorkingDirectory = self.target_dir
-                    shortcut.IconLocation = os.path.join(self.target_dir, 'assets', 'Brahma_Lite_Logo.ico')
+                    shortcut.IconLocation = os.path.join(self.target_dir, 'assets', 'Celestia_Logo.ico')
                     shortcut.WindowStyle = 1 # Normal window
                     shortcut.save()
                 except Exception as e:

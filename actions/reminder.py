@@ -52,7 +52,7 @@ except Exception:
 
     if _OS == "Darwin":
         from pathlib import Path
-        label = f"com.brahma.{task_name.lower()}"
+        label = f"com.celestia.{task_name.lower()}"
         plist_dir = Path.home() / "Library" / "LaunchAgents"
         plist_dir.mkdir(parents=True, exist_ok=True)
         plist = plist_dir / f"{label}.plist"

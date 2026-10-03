@@ -14,14 +14,14 @@ logger.setLevel(logging.INFO)
 
 
 def _get_app_data_dir() -> Path:
-    """Returns local app data directory for Brahma AI."""
+    """Returns local app data directory for Celestia."""
     if platform.system() == "Windows":
         base = os.environ.get("LOCALAPPDATA")
         if base:
-            p = Path(base) / "BrahmaAI" / "PlaywrightProfile"
+            p = Path(base) / "CelestiaAI" / "PlaywrightProfile"
             p.mkdir(parents=True, exist_ok=True)
             return p
-    home = Path.home() / ".brahma_ai" / "playwright_profile"
+    home = Path.home() / ".celestia_ai" / "playwright_profile"
     home.mkdir(parents=True, exist_ok=True)
     return home
 

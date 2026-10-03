@@ -121,7 +121,7 @@ def bootstrap_config() -> None:
     else:
         print(f"⚠️  {EXAMPLE_KEYS} missing — create {API_KEYS} manually.")
 
-    # User-data copies (~/.BrahmaAI/config) used by llm_client & friends.
+    # User-data copies (~/.config/CelestiaAI or ~/CelestiaAI) used by llm_client & friends.
     try:
         from core.user_paths import get_user_data_dir
         user_cfg = get_user_data_dir() / "config"
@@ -146,9 +146,9 @@ def print_next_steps() -> None:
         print("  • Optional display-brightness API: brew install brightness")
     print("\n✅ Setup complete! Launch with:")
     if platform.system() == "Windows":
-        print("   start_brahma.bat")
+        print("   start_celestia.bat")
     else:
-        print("   ./start_brahma.sh   (or: python3 main.py)")
+        print("   ./start_celestia.sh   (or: python3 main.py)")
 
 
 def main() -> None:
